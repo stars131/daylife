@@ -10,6 +10,7 @@ vi.mock("@/lib/prisma", () => ({
       callback({
         event: {
           count: vi.fn(async () => 1),
+          findMany: vi.fn(async () => []),
           create: vi.fn(async ({ data }) => ({
             id: "created_1",
             title: data.title,
@@ -30,8 +31,7 @@ vi.mock("@/lib/prisma", () => ({
           })),
           update: vi.fn(async () => existingEvent),
           delete: vi.fn(async () => existingEvent),
-          findUnique: vi.fn(async () => ({ parentId: null })),
-          findUniqueOrThrow: vi.fn(async () => existingEvent)
+          findUnique: vi.fn(async ({ select }) => (select ? { parentId: null } : existingEvent))
         },
         eventAuditLog: {
           create: vi.fn(async () => ({}))

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildEventWhere, dashboardBuckets, parseTags, updateEvent, type SerializedEvent } from "@/lib/event-service";
+import { buildEventWhere, dashboardBuckets, deleteEvent, parseTags, updateEvent, type SerializedEvent } from "@/lib/event-service";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -120,6 +120,32 @@ describe("event parent validation", () => {
     };
 
     await expect(updateEvent("event_1", { endAt: "2026-06-08T09:00:00.000Z" }, db as never)).rejects.toThrow("结束时间不能早于开始时间");
+  });
+});
+
+describe("event deletion audit", () => {
+  it("stores the deleted event and direct children in the audit snapshot", async () => {
+    const parent = dbEvent(event({ id: "parent", title: "父目标" }));
+    const child = dbEvent(event({ id: "child", title: "子任务", parentId: "parent" }));
+    const auditCreate = vi.fn(async (_input: { data: { snapshotJson: string } }) => ({}));
+    const db = {
+      event: {
+        findUnique: vi.fn(async () => parent),
+        findMany: vi.fn(async () => [child]),
+        delete: vi.fn(async () => parent)
+      },
+      eventAuditLog: {
+        create: auditCreate
+      }
+    };
+
+    await deleteEvent("parent", db as never);
+
+    const snapshotJson = auditCreate.mock.calls[0]?.[0].data.snapshotJson;
+    const snapshot = JSON.parse(snapshotJson) as { event: SerializedEvent; children: SerializedEvent[] };
+    expect(snapshot.event.id).toBe("parent");
+    expect(snapshot.children.map((item) => item.id)).toEqual(["child"]);
+    expect(snapshot.children[0]?.parentId).toBe("parent");
   });
 });
 

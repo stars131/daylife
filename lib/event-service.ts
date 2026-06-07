@@ -26,6 +26,10 @@ export type SerializedEvent = {
 };
 
 type EventRecord = Prisma.EventGetPayload<object>;
+type DeleteSnapshot = {
+  event: SerializedEvent;
+  children: SerializedEvent[];
+};
 const unfinishedStatuses = ["TODO", "DOING"] as const;
 const priorityRank: Record<string, number> = {
   HIGH: 3,
@@ -202,17 +206,29 @@ export async function updateEvent(id: string, input: EventPatchInput, db: EventD
 }
 
 export async function deleteEvent(id: string, db: EventDb = prisma): Promise<SerializedEvent> {
-  await assertEventExists(id, db);
-  const existing = await db.event.findUniqueOrThrow({ where: { id } });
+  const existing = await getEventRecord(id, db);
+  const children = await db.event.findMany({
+    where: { parentId: id },
+    orderBy: [{ createdAt: "asc" }]
+  });
+  const snapshot = buildDeleteSnapshot(existing, children);
+
   await db.eventAuditLog.create({
     data: {
       eventId: existing.id,
       action: "delete",
-      snapshotJson: JSON.stringify(serializeEvent(existing))
+      snapshotJson: JSON.stringify(snapshot)
     }
   });
   const event = await db.event.delete({ where: { id } });
   return serializeEvent(event);
+}
+
+function buildDeleteSnapshot(event: EventRecord, children: EventRecord[]): DeleteSnapshot {
+  return {
+    event: serializeEvent(event),
+    children: children.map(serializeEvent)
+  };
 }
 
 export async function deleteEventWithAudit(id: string): Promise<SerializedEvent> {
