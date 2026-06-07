@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Event {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  startAt     DateTime?
+  endAt       DateTime?
+  allDay      Boolean     @default(false)
+  type        String
+  scope       String
+  status      String      @default("TODO")
+  priority    String      @default("MEDIUM")
+  tags        String      @default("[]")
+  repeatRule  String?
+  reminderAt  DateTime?
+  parentId    String?
+  parent      Event?      @relation("EventParent", fields: [parentId], references: [id])
+  children    Event[]     @relation("EventParent")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([startAt])
+  @@index([scope])
+  @@index([status])
+  @@index([type])
+  @@index([parentId])
+}
+
+model AiActionLog {
+  id          String   @id @default(cuid())
+  userInput   String
+  rawResponse  String
+  actionsJson  String
+  status      String
+  error       String?
+  createdAt   DateTime @default(now())
+}
+
+model EventAuditLog {
+  id           String   @id @default(cuid())
+  eventId      String
+  action       String
+  snapshotJson String
+  createdAt    DateTime @default(now())
+
+  @@index([eventId])
+  @@index([action])
+}
