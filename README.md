@@ -128,6 +128,8 @@ npm run build
 
 当前工作区已通过 `npm run typecheck`、`npm run test` 和 `npm run build`。本机执行 `docker compose build` 时，如果遇到 Docker Buildx lock 文件权限问题，请先修复当前用户对 Docker 配置目录的权限，或在具备 Docker 权限的服务器上执行部署命令。
 
+工程审计和后续优化建议见 [docs/ENGINEERING_REVIEW.md](docs/ENGINEERING_REVIEW.md)。
+
 ## 手动验收清单
 
 1. `docker compose up -d --build` 可以启动应用。

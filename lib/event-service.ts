@@ -4,6 +4,8 @@ import { dateParamToRange, dayRange, getNow, monthRange, weekRange } from "@/lib
 import type { EventMutationInput, EventPatchInput, EventQueryInput } from "@/lib/schemas";
 import { AppError } from "@/lib/errors";
 
+type EventDb = typeof prisma | Prisma.TransactionClient;
+
 export type SerializedEvent = {
   id: string;
   title: string;
@@ -112,54 +114,92 @@ export async function listEvents(query: EventQueryInput = {}): Promise<Serialize
 }
 
 export async function getEvent(id: string): Promise<SerializedEvent> {
-  const event = await prisma.event.findUnique({ where: { id } });
+  const event = await getEventRecord(id);
+  return serializeEvent(event);
+}
+
+async function getEventRecord(id: string, db: EventDb = prisma): Promise<EventRecord> {
+  const event = await db.event.findUnique({ where: { id } });
   if (!event) {
     throw new AppError("事项不存在", 404, "EVENT_NOT_FOUND");
   }
-  return serializeEvent(event);
+  return event;
 }
 
-export async function createEvent(input: EventMutationInput): Promise<SerializedEvent> {
+export async function createEvent(input: EventMutationInput, db: EventDb = prisma): Promise<SerializedEvent> {
   if (input.parentId) {
-    await assertEventExists(input.parentId);
+    await assertEventExists(input.parentId, db);
   }
-  const event = await prisma.event.create({ data: toCreateData(input) });
+  const event = await db.event.create({ data: toCreateData(input) });
   return serializeEvent(event);
 }
 
-export async function updateEvent(id: string, input: EventPatchInput): Promise<SerializedEvent> {
-  await assertEventExists(id);
-  if (input.parentId) {
-    await assertEventExists(input.parentId);
+export async function updateEvent(id: string, input: EventPatchInput, db: EventDb = prisma): Promise<SerializedEvent> {
+  await assertEventExists(id, db);
+  if (input.parentId !== undefined) {
+    await assertParentChangeIsValid(id, input.parentId, db);
   }
-  const event = await prisma.event.update({ where: { id }, data: toUpdateData(input) });
+  const event = await db.event.update({ where: { id }, data: toUpdateData(input) });
   return serializeEvent(event);
 }
 
-export async function deleteEvent(id: string): Promise<SerializedEvent> {
-  await assertEventExists(id);
-  const event = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    const existing = await tx.event.findUniqueOrThrow({ where: { id } });
-    await tx.eventAuditLog.create({
-      data: {
-        eventId: existing.id,
-        action: "delete",
-        snapshotJson: JSON.stringify(serializeEvent(existing))
-      }
-    });
-    return tx.event.delete({ where: { id } });
+export async function deleteEvent(id: string, db: EventDb = prisma): Promise<SerializedEvent> {
+  await assertEventExists(id, db);
+  const existing = await db.event.findUniqueOrThrow({ where: { id } });
+  await db.eventAuditLog.create({
+    data: {
+      eventId: existing.id,
+      action: "delete",
+      snapshotJson: JSON.stringify(serializeEvent(existing))
+    }
   });
+  const event = await db.event.delete({ where: { id } });
   return serializeEvent(event);
 }
 
-export async function setEventStatus(id: string, status: "DONE" | "CANCELLED"): Promise<SerializedEvent> {
-  return updateEvent(id, { status });
+export async function deleteEventWithAudit(id: string): Promise<SerializedEvent> {
+  return prisma.$transaction((tx) => deleteEvent(id, tx));
 }
 
-export async function assertEventExists(id: string): Promise<void> {
-  const count = await prisma.event.count({ where: { id } });
+export async function setEventStatus(id: string, status: "DONE" | "CANCELLED", db: EventDb = prisma): Promise<SerializedEvent> {
+  return updateEvent(id, { status }, db);
+}
+
+export async function assertEventExists(id: string, db: EventDb = prisma): Promise<void> {
+  const count = await db.event.count({ where: { id } });
   if (count === 0) {
     throw new AppError("目标事项不存在", 404, "EVENT_NOT_FOUND");
+  }
+}
+
+async function assertParentChangeIsValid(id: string, parentId: string | null, db: EventDb): Promise<void> {
+  if (!parentId) {
+    return;
+  }
+
+  if (parentId === id) {
+    throw new AppError("父目标不能指向自身", 422, "EVENT_PARENT_SELF_REFERENCE");
+  }
+
+  let currentParentId: string | null = parentId;
+  const visited = new Set<string>([id]);
+
+  while (currentParentId) {
+    if (visited.has(currentParentId)) {
+      throw new AppError("父目标关系不能形成循环", 422, "EVENT_PARENT_CYCLE");
+    }
+
+    visited.add(currentParentId);
+    const parent: { parentId: string | null } | null = await db.event.findUnique({
+      where: { id: currentParentId },
+      select: { parentId: true }
+    });
+
+    if (!parent) {
+      throw new AppError("父目标不存在", 404, "EVENT_PARENT_NOT_FOUND");
+    }
+
+    currentParentId = parent.parentId;
   }
 }
 

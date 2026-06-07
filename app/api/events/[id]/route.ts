@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
-import { deleteEvent, getEvent, updateEvent } from "@/lib/event-service";
+import { deleteEventWithAudit, getEvent, updateEvent } from "@/lib/event-service";
 import { toErrorResponse } from "@/lib/errors";
 import { eventPatchSchema } from "@/lib/schemas";
 
@@ -34,7 +34,7 @@ export async function DELETE(_request: Request, context: { params: { id: string 
   try {
     await requireSession();
     const { id } = paramsSchema.parse(context.params);
-    return NextResponse.json({ event: await deleteEvent(id) });
+    return NextResponse.json({ event: await deleteEventWithAudit(id) });
   } catch (error) {
     const response = toErrorResponse(error);
     return NextResponse.json(response.body, { status: response.status });

@@ -1,8 +1,51 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "@/lib/errors";
 import { parseStrictJson } from "@/lib/ai/json";
-import { validateAiBusinessRules } from "@/lib/ai/service";
+import { confirmAiActions, validateAiBusinessRules } from "@/lib/ai/service";
 import type { SerializedEvent } from "@/lib/event-service";
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    $transaction: vi.fn(async (callback) =>
+      callback({
+        event: {
+          count: vi.fn(async () => 1),
+          create: vi.fn(async ({ data }) => ({
+            id: "created_1",
+            title: data.title,
+            description: data.description ?? null,
+            startAt: data.startAt ?? null,
+            endAt: data.endAt ?? null,
+            allDay: data.allDay,
+            type: data.type,
+            scope: data.scope,
+            status: data.status,
+            priority: data.priority,
+            tags: data.tags,
+            repeatRule: data.repeatRule ?? null,
+            reminderAt: data.reminderAt ?? null,
+            parentId: data.parentId ?? null,
+            createdAt: new Date("2026-06-08T00:00:00Z"),
+            updatedAt: new Date("2026-06-08T00:00:00Z")
+          })),
+          update: vi.fn(async () => existingEvent),
+          delete: vi.fn(async () => existingEvent),
+          findUnique: vi.fn(async () => ({ parentId: null })),
+          findUniqueOrThrow: vi.fn(async () => existingEvent)
+        },
+        eventAuditLog: {
+          create: vi.fn(async () => ({}))
+        },
+        aiActionLog: {
+          create: vi.fn(async () => ({}))
+        }
+      })
+    ),
+    aiActionLog: {
+      create: vi.fn(async () => ({}))
+    }
+  }
+}));
 
 const existingEvent: SerializedEvent = {
   id: "event_1",
@@ -24,6 +67,10 @@ const existingEvent: SerializedEvent = {
 };
 
 describe("AI JSON parser", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("rejects markdown-wrapped output", () => {
     expect(() => parseStrictJson("```json\n{}\n```")).toThrow(AppError);
   });
@@ -98,5 +145,38 @@ describe("AI business validation", () => {
     );
 
     expect(result.clarificationNeeded).toBe(true);
+  });
+});
+
+describe("AI confirmation execution", () => {
+  it("executes confirmed actions inside one database transaction", async () => {
+    const { prisma } = await import("@/lib/prisma");
+
+    const result = await confirmAiActions(
+      [
+        {
+          action: "create",
+          targetId: null,
+          matchQuery: null,
+          data: {
+            title: "事务测试",
+            startAt: null,
+            endAt: null,
+            allDay: false,
+            type: "TASK",
+            scope: "DAY",
+            status: "TODO",
+            priority: "MEDIUM",
+            tags: []
+          },
+          confidence: 0.95,
+          reason: ""
+        }
+      ],
+      "创建事务测试"
+    );
+
+    expect(result.applied).toHaveLength(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 });

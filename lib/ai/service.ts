@@ -157,46 +157,51 @@ export function validateAiBusinessRules(result: AiParseResult, existingEvents: S
 }
 
 export async function confirmAiActions(actions: AiAction[], userInput = "", safetyAcknowledged = false): Promise<ConfirmResult> {
-  const applied: SerializedEvent[] = [];
-  const skipped: ConfirmResult["skipped"] = [];
-
   try {
-    for (const action of actions) {
-      assertSafeToExecute(action, safetyAcknowledged);
+    const result = await prisma.$transaction(async (tx) => {
+      const applied: SerializedEvent[] = [];
 
-      if (action.action === "create") {
-        if (!action.data?.title) {
-          throw new AppError("创建操作缺少标题", 422, "AI_CREATE_DATA_INVALID", action);
+      for (const action of actions) {
+        assertSafeToExecute(action, safetyAcknowledged);
+
+        if (action.action === "create") {
+          if (!action.data?.title) {
+            throw new AppError("创建操作缺少标题", 422, "AI_CREATE_DATA_INVALID", action);
+          }
+          applied.push(await createEvent(eventMutationSchema.parse(action.data), tx));
+          continue;
         }
-        applied.push(await createEvent(eventMutationSchema.parse(action.data)));
-        continue;
-      }
 
-      assertTargetedAction(action);
-      await assertEventExists(action.targetId);
+        assertTargetedAction(action);
+        await assertEventExists(action.targetId, tx);
 
-      if (action.action === "update") {
-        if (!action.data || Object.keys(action.data).length === 0) {
-          throw new AppError("更新操作缺少修改内容", 422, "AI_UPDATE_DATA_INVALID", action);
+        if (action.action === "update") {
+          if (!action.data || Object.keys(action.data).length === 0) {
+            throw new AppError("更新操作缺少修改内容", 422, "AI_UPDATE_DATA_INVALID", action);
+          }
+          applied.push(await updateEvent(action.targetId, eventPatchSchema.parse(action.data), tx));
+        } else if (action.action === "delete") {
+          applied.push(await deleteEvent(action.targetId, tx));
+        } else if (action.action === "complete") {
+          applied.push(await setEventStatus(action.targetId, "DONE", tx));
+        } else if (action.action === "cancel") {
+          applied.push(await setEventStatus(action.targetId, "CANCELLED", tx));
         }
-        applied.push(await updateEvent(action.targetId, eventPatchSchema.parse(action.data)));
-      } else if (action.action === "delete") {
-        applied.push(await deleteEvent(action.targetId));
-      } else if (action.action === "complete") {
-        applied.push(await setEventStatus(action.targetId, "DONE"));
-      } else if (action.action === "cancel") {
-        applied.push(await setEventStatus(action.targetId, "CANCELLED"));
       }
-    }
 
-    await prisma.aiActionLog.create({
-      data: {
-        userInput,
-        rawResponse: "",
-        actionsJson: JSON.stringify(actions),
-        status: "confirmed"
-      }
+      await tx.aiActionLog.create({
+        data: {
+          userInput,
+          rawResponse: "",
+          actionsJson: JSON.stringify(actions),
+          status: "confirmed"
+        }
+      });
+
+      return { applied, skipped: [] };
     });
+
+    return result;
   } catch (error) {
     await prisma.aiActionLog.create({
       data: {
@@ -209,8 +214,6 @@ export async function confirmAiActions(actions: AiAction[], userInput = "", safe
     });
     throw error;
   }
-
-  return { applied, skipped };
 }
 
 export async function actionPreview(actions: AiAction[]): Promise<Array<{ action: AiAction; target?: SerializedEvent }>> {

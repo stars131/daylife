@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { aiParseResultSchema, eventMutationSchema } from "@/lib/schemas";
+import { dayRange, formatIsoWithTimezone } from "@/lib/dates";
 
 describe("event schema", () => {
   it("accepts a valid event mutation", () => {
@@ -60,5 +61,14 @@ describe("AI parse schema", () => {
     });
 
     expect(parsed.actions[0].data?.title).toBe("健身");
+  });
+});
+
+describe("timezone date utilities", () => {
+  it("uses the configured app timezone for day boundaries", () => {
+    const range = dayRange(new Date("2026-06-08T01:30:00Z"), "Australia/Perth");
+
+    expect(formatIsoWithTimezone(range.from, "Australia/Perth")).toBe("2026-06-08T00:00:00+08:00");
+    expect(formatIsoWithTimezone(range.to, "Australia/Perth")).toBe("2026-06-08T23:59:59+08:00");
   });
 });

@@ -6,17 +6,20 @@ CREATE TABLE "Event" (
     "startAt" DATETIME,
     "endAt" DATETIME,
     "allDay" BOOLEAN NOT NULL DEFAULT false,
-    "type" TEXT NOT NULL,
-    "scope" TEXT NOT NULL,
+    "type" TEXT NOT NULL CHECK ("type" IN ('EVENT', 'TASK', 'HABIT', 'GOAL')),
+    "scope" TEXT NOT NULL CHECK ("scope" IN ('DAY', 'WEEK', 'MONTH', 'LONG_TERM')),
     "status" TEXT NOT NULL DEFAULT 'TODO',
-    "priority" TEXT NOT NULL DEFAULT 'MEDIUM',
+    "priority" TEXT NOT NULL DEFAULT 'MEDIUM' CHECK ("priority" IN ('LOW', 'MEDIUM', 'HIGH')),
     "tags" TEXT NOT NULL DEFAULT '[]',
     "repeatRule" TEXT,
     "reminderAt" DATETIME,
     "parentId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Event_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Event" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Event_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Event" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CHECK ("status" IN ('TODO', 'DOING', 'DONE', 'CANCELLED')),
+    CHECK ("endAt" IS NULL OR "startAt" IS NULL OR "endAt" >= "startAt"),
+    CHECK ("parentId" IS NULL OR "parentId" <> "id")
 );
 
 -- CreateTable
