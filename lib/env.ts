@@ -1,9 +1,12 @@
 import { z } from "zod";
+import { isValidTimezone } from "@/lib/timezone";
+
+const appTimezoneSchema = z.string().min(1).refine(isValidTimezone, "must be a valid IANA timezone");
 
 const baseEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   APP_URL: z.string().url().optional(),
-  APP_TIMEZONE: z.string().min(1).default("Australia/Perth"),
+  APP_TIMEZONE: appTimezoneSchema.default("Australia/Perth"),
   DATABASE_URL: z.string().min(1)
 });
 
@@ -47,7 +50,11 @@ export function getLlmEnv(): LlmEnv {
 }
 
 export function getAppTimezone(): string {
-  return process.env.APP_TIMEZONE || "Australia/Perth";
+  const timezone = process.env.APP_TIMEZONE || "Australia/Perth";
+  if (!isValidTimezone(timezone)) {
+    throw new Error("Invalid APP_TIMEZONE environment: APP_TIMEZONE must be a valid IANA timezone");
+  }
+  return timezone;
 }
 
 export function getOptionalAppUrl(): string {

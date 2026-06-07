@@ -4,6 +4,7 @@ import { Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { SerializedEvent } from "@/lib/event-service";
+import { dateTimeInputToIso, formatDateTimeInput } from "@/lib/timezone";
 
 type EventFormState = {
   title: string;
@@ -21,29 +22,12 @@ type EventFormState = {
   parentId: string;
 };
 
-function toLocalInput(value: string | null): string {
-  if (!value) {
-    return "";
-  }
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60 * 1000);
-  return local.toISOString().slice(0, 16);
-}
-
-function fromLocalInput(value: string): string | null {
-  if (!value) {
-    return null;
-  }
-  return new Date(value).toISOString();
-}
-
-function initialState(event?: SerializedEvent): EventFormState {
+function initialState(event: SerializedEvent | undefined, timezone: string): EventFormState {
   return {
     title: event?.title ?? "",
     description: event?.description ?? "",
-    startAt: toLocalInput(event?.startAt ?? null),
-    endAt: toLocalInput(event?.endAt ?? null),
+    startAt: formatDateTimeInput(event?.startAt ?? null, timezone),
+    endAt: formatDateTimeInput(event?.endAt ?? null, timezone),
     allDay: event?.allDay ?? false,
     type: event?.type ?? "TASK",
     scope: event?.scope ?? "DAY",
@@ -51,17 +35,17 @@ function initialState(event?: SerializedEvent): EventFormState {
     priority: event?.priority ?? "MEDIUM",
     tags: event?.tags.join(", ") ?? "",
     repeatRule: event?.repeatRule ?? "",
-    reminderAt: toLocalInput(event?.reminderAt ?? null),
+    reminderAt: formatDateTimeInput(event?.reminderAt ?? null, timezone),
     parentId: event?.parentId ?? ""
   };
 }
 
-function buildPayload(state: EventFormState) {
+function buildPayload(state: EventFormState, timezone: string) {
   return {
     title: state.title,
     description: state.description || null,
-    startAt: fromLocalInput(state.startAt),
-    endAt: fromLocalInput(state.endAt),
+    startAt: dateTimeInputToIso(state.startAt, timezone),
+    endAt: dateTimeInputToIso(state.endAt, timezone),
     allDay: state.allDay,
     type: state.type,
     scope: state.scope,
@@ -72,14 +56,14 @@ function buildPayload(state: EventFormState) {
       .map((tag) => tag.trim())
       .filter(Boolean),
     repeatRule: state.repeatRule || null,
-    reminderAt: fromLocalInput(state.reminderAt),
+    reminderAt: dateTimeInputToIso(state.reminderAt, timezone),
     parentId: state.parentId || null
   };
 }
 
 export function EventForm({ event, timezone }: { event?: SerializedEvent; timezone: string }) {
   const router = useRouter();
-  const [state, setState] = useState<EventFormState>(() => initialState(event));
+  const [state, setState] = useState<EventFormState>(() => initialState(event, timezone));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const isEdit = Boolean(event);
@@ -99,7 +83,7 @@ export function EventForm({ event, timezone }: { event?: SerializedEvent; timezo
       const response = await fetch(isEdit ? `/api/events/${event?.id}` : "/api/events", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildPayload(state))
+        body: JSON.stringify(buildPayload(state, timezone))
       });
 
       const data = (await response.json()) as { event?: SerializedEvent; error?: string };
@@ -174,7 +158,7 @@ export function EventForm({ event, timezone }: { event?: SerializedEvent; timezo
       <div className="grid gap-4 rounded-lg border border-line bg-white p-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-ink">
           开始时间
-          <span className="ml-1 text-xs font-normal text-muted">保存后按 {timezone} 展示</span>
+          <span className="ml-1 text-xs font-normal text-muted">按 {timezone} 录入和展示</span>
           <input
             type="datetime-local"
             value={state.startAt}
@@ -184,7 +168,7 @@ export function EventForm({ event, timezone }: { event?: SerializedEvent; timezo
         </label>
         <label className="text-sm font-medium text-ink">
           结束时间
-          <span className="ml-1 text-xs font-normal text-muted">保存后按 {timezone} 展示</span>
+          <span className="ml-1 text-xs font-normal text-muted">按 {timezone} 录入和展示</span>
           <input
             type="datetime-local"
             value={state.endAt}
@@ -194,7 +178,7 @@ export function EventForm({ event, timezone }: { event?: SerializedEvent; timezo
         </label>
         <label className="text-sm font-medium text-ink">
           提醒时间
-          <span className="ml-1 text-xs font-normal text-muted">保存后按 {timezone} 展示</span>
+          <span className="ml-1 text-xs font-normal text-muted">按 {timezone} 录入和展示</span>
           <input
             type="datetime-local"
             value={state.reminderAt}

@@ -1,10 +1,11 @@
-import { addDays, format, startOfMonth, startOfWeek } from "date-fns";
 import { CalendarFilters } from "@/components/calendar-filters";
 import { EventList } from "@/components/event-list";
 import { EmptyState } from "@/components/empty-state";
-import { dateParamToRange, dayRange, monthRange, weekRange } from "@/lib/dates";
+import { dateParamToRange, dayRange, formatDateOnly, monthRange, weekRange } from "@/lib/dates";
+import { getAppTimezone } from "@/lib/env";
 import { listEvents } from "@/lib/event-service";
 import { eventQuerySchema } from "@/lib/schemas";
+import { addLocalDays, getZonedDateTimeParts, type LocalDateParts } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +13,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
   const normalized = Object.fromEntries(
     Object.entries(searchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
   );
-  const view = normalized.view || "day";
+  const view = normalizeCalendarView(normalized.view);
   const now = new Date();
+  const timezone = getAppTimezone();
   const range =
-    view === "week" ? weekRange(now) : view === "month" ? monthRange(now) : dateParamToRange(normalized.from, normalized.to) || dayRange(now);
+    view === "week" ? weekRange(now, timezone) : view === "month" ? monthRange(now, timezone) : dateParamToRange(normalized.from, normalized.to, timezone) || dayRange(now, timezone);
+  const rangeFrom = formatDateOnly(range.from);
+  const rangeTo = formatDateOnly(range.to);
   const query = eventQuerySchema.parse({
     ...normalized,
-    from: format(range.from, "yyyy-MM-dd"),
-    to: format(range.to, "yyyy-MM-dd")
+    from: rangeFrom,
+    to: rangeTo
   });
   const events = await listEvents(query);
 
@@ -28,7 +32,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-ink">日历</h1>
-          <p className="text-sm text-muted">{format(range.from, "yyyy-MM-dd")} 至 {format(range.to, "yyyy-MM-dd")}</p>
+          <p className="text-sm text-muted">{rangeFrom} 至 {rangeTo}</p>
         </div>
       </div>
 
@@ -50,16 +54,18 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
 
       <CalendarFilters />
 
-      {view === "month" ? <MonthGrid date={now} /> : null}
+      {view === "month" ? <MonthGrid date={now} timezone={timezone} /> : null}
       <EventList title="事项列表" events={events} empty="当前范围没有事项" />
     </div>
   );
 }
 
-function MonthGrid({ date }: { date: Date }) {
-  const monthStart = startOfMonth(date);
-  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-  const days = Array.from({ length: 35 }, (_, index) => addDays(gridStart, index));
+function MonthGrid({ date, timezone }: { date: Date; timezone: string }) {
+  const current = getZonedDateTimeParts(date, timezone);
+  const monthStart = { year: current.year, month: current.month, day: 1 };
+  const daysSinceMonday = (localWeekday(monthStart) + 6) % 7;
+  const gridStart = addLocalDays(monthStart, -daysSinceMonday);
+  const days = Array.from({ length: 35 }, (_, index) => addLocalDays(gridStart, index));
 
   if (days.length === 0) {
     return <EmptyState title="暂无日历数据" />;
@@ -73,10 +79,18 @@ function MonthGrid({ date }: { date: Date }) {
         </div>
       ))}
       {days.map((day) => (
-        <div key={day.toISOString()} className="min-h-12 border-b border-r border-line p-2 text-ink">
-          {format(day, "d")}
+        <div key={`${day.year}-${day.month}-${day.day}`} className="min-h-12 border-b border-r border-line p-2 text-ink">
+          {day.day}
         </div>
       ))}
     </div>
   );
+}
+
+function localWeekday(parts: LocalDateParts): number {
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+}
+
+function normalizeCalendarView(value: unknown): "day" | "week" | "month" {
+  return value === "week" || value === "month" ? value : "day";
 }

@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client/index";
 import { prisma } from "@/lib/prisma";
-import { dateParamToRange, dayRange, getNow, monthRange, weekRange } from "@/lib/dates";
+import { dateParamToRange, dayRange, getNow, monthRange, weekRange, type DateRange } from "@/lib/dates";
 import type { EventMutationInput, EventPatchInput, EventQueryInput } from "@/lib/schemas";
 import { AppError } from "@/lib/errors";
 
@@ -92,10 +92,7 @@ export function buildEventWhere(query: EventQueryInput): Prisma.EventWhereInput 
   const range = dateParamToRange(query.from, query.to);
 
   if (range) {
-    where.OR = [
-      { startAt: { gte: range.from, lte: range.to } },
-      { endAt: { gte: range.from, lte: range.to } }
-    ];
+    Object.assign(where, buildDateRangeOverlapWhere(range));
   }
 
   if (query.scope) where.scope = query.scope;
@@ -104,6 +101,18 @@ export function buildEventWhere(query: EventQueryInput): Prisma.EventWhereInput 
   if (query.tag) where.tags = { contains: JSON.stringify(query.tag) };
 
   return where;
+}
+
+export function buildDateRangeOverlapWhere(range: DateRange): Prisma.EventWhereInput {
+  return {
+    OR: [
+      { startAt: { gte: range.from, lte: range.to } },
+      { endAt: { gte: range.from, lte: range.to } },
+      {
+        AND: [{ startAt: { lte: range.from } }, { endAt: { gte: range.to } }]
+      }
+    ]
+  };
 }
 
 export async function listEvents(query: EventQueryInput = {}): Promise<SerializedEvent[]> {
@@ -223,25 +232,28 @@ export async function dashboardBuckets(now = getNow()): Promise<{
     prisma.event.findMany({
       where: {
         OR: [
-          { startAt: { gte: day.from, lte: day.to } },
+          buildDateRangeOverlapWhere(day),
           { scope: "DAY", status: { notIn: ["DONE", "CANCELLED"] } }
         ]
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),
     prisma.event.findMany({
-      where: { startAt: { lt: now }, status: { notIn: ["DONE", "CANCELLED"] } },
+      where: {
+        status: { notIn: ["DONE", "CANCELLED"] },
+        OR: [{ endAt: { lt: now } }, { startAt: { lt: now }, endAt: null }]
+      },
       orderBy: [{ startAt: "asc" }]
     }),
     prisma.event.findMany({
       where: {
-        OR: [{ startAt: { gte: week.from, lte: week.to } }, { scope: "WEEK" }]
+        OR: [buildDateRangeOverlapWhere(week), { scope: "WEEK" }]
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),
     prisma.event.findMany({
       where: {
-        OR: [{ startAt: { gte: month.from, lte: month.to } }, { scope: "MONTH" }]
+        OR: [buildDateRangeOverlapWhere(month), { scope: "MONTH" }]
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),

@@ -41,14 +41,24 @@ export const eventMutationSchema = eventObjectSchema.superRefine(validateDateOrd
 
 export const eventPatchSchema = eventObjectSchema.partial().superRefine(validateDateOrder);
 
-export const eventQuerySchema = z.object({
-  from: z.string().date().optional(),
-  to: z.string().date().optional(),
-  scope: eventScopeSchema.optional(),
-  status: eventStatusSchema.optional(),
-  type: eventTypeSchema.optional(),
-  tag: z.string().trim().min(1).optional()
-});
+export const eventQuerySchema = z
+  .object({
+    from: z.string().date().optional(),
+    to: z.string().date().optional(),
+    scope: eventScopeSchema.optional(),
+    status: eventStatusSchema.optional(),
+    type: eventTypeSchema.optional(),
+    tag: z.string().trim().min(1).optional()
+  })
+  .superRefine((value, ctx) => {
+    if (value.from && value.to && value.from > value.to) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["to"],
+        message: "结束日期不能早于开始日期"
+      });
+    }
+  });
 
 export const nonEmptyEventPatchSchema = eventPatchSchema.refine((value) => Object.keys(value).length > 0, {
   message: "至少提供一个要修改的字段"

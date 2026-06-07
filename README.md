@@ -95,6 +95,7 @@ AI 页面采用两阶段流程：
 如需轮换大模型 API key，只更新服务器或部署平台中的 `LLM_API_KEY`，然后重启应用。不要把真实 key 写入 README、前端代码或构建产物。
 
 不要在含真实 `.env` 的环境中公开粘贴 `docker compose config` 输出；该命令会展开 `env_file` 中的变量。
+如需验证 Compose 配置，请运行 `COMPOSE_ENV_FILE=.env.example docker compose config`，避免读取真实密钥。
 
 ## API
 

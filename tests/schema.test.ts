@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { aiParseResultSchema, eventMutationSchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
-import { dayRange, formatIsoWithTimezone } from "@/lib/dates";
+import { aiParseResultSchema, eventMutationSchema, eventQuerySchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
+import { dateParamToRange, dayRange, formatIsoWithTimezone } from "@/lib/dates";
+import { dateTimeInputToIso, formatDateTimeInput, isValidTimezone } from "@/lib/timezone";
 
 describe("event schema", () => {
   it("accepts a valid event mutation", () => {
@@ -36,6 +37,10 @@ describe("event schema", () => {
 
   it("rejects empty event patches", () => {
     expect(() => nonEmptyEventPatchSchema.parse({})).toThrow();
+  });
+
+  it("rejects reversed query date ranges", () => {
+    expect(() => eventQuerySchema.parse({ from: "2026-06-10", to: "2026-06-08" })).toThrow("结束日期不能早于开始日期");
   });
 });
 
@@ -74,5 +79,20 @@ describe("timezone date utilities", () => {
 
     expect(formatIsoWithTimezone(range.from, "Australia/Perth")).toBe("2026-06-08T00:00:00+08:00");
     expect(formatIsoWithTimezone(range.to, "Australia/Perth")).toBe("2026-06-08T23:59:59+08:00");
+  });
+
+  it("converts datetime-local values using the app timezone instead of the browser timezone", () => {
+    expect(dateTimeInputToIso("2026-06-08T09:30", "Australia/Perth")).toBe("2026-06-08T01:30:00.000Z");
+    expect(formatDateTimeInput("2026-06-08T01:30:00.000Z", "Australia/Perth")).toBe("2026-06-08T09:30");
+  });
+
+  it("validates IANA timezone names", () => {
+    expect(isValidTimezone("Australia/Perth")).toBe(true);
+    expect(isValidTimezone("Invalid/Timezone")).toBe(false);
+  });
+
+  it("ignores invalid date query parameters before timezone conversion", () => {
+    expect(dateParamToRange("not-a-date", "2026-06-08", "Australia/Perth")).toBeNull();
+    expect(dateParamToRange("2026-06-10", "2026-06-08", "Australia/Perth")).toBeNull();
   });
 });

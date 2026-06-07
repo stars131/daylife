@@ -6,6 +6,19 @@ describe("event query helpers", () => {
     expect(buildEventWhere({ tag: "work" })).toEqual({ tags: { contains: "\"work\"" } });
   });
 
+  it("includes events that fully span a queried date range", () => {
+    const from = new Date("2026-06-07T16:00:00.000Z");
+    const to = new Date("2026-06-08T15:59:59.999Z");
+
+    expect(buildEventWhere({ from: "2026-06-08", to: "2026-06-08" })).toEqual({
+      OR: [
+        { startAt: { gte: from, lte: to } },
+        { endAt: { gte: from, lte: to } },
+        { AND: [{ startAt: { lte: from } }, { endAt: { gte: to } }] }
+      ]
+    });
+  });
+
   it("parses stored tag JSON defensively", () => {
     expect(parseTags('["work","health"]')).toEqual(["work", "health"]);
     expect(parseTags("not-json")).toEqual([]);
