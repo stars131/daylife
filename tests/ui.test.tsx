@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EventList } from "@/components/event-list";
 import type { SerializedEvent } from "@/lib/event-service";
 
@@ -8,6 +9,10 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/",
   useSearchParams: () => new URLSearchParams()
 }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 const event: SerializedEvent = {
   id: "event_1",
@@ -42,5 +47,20 @@ describe("EventList", () => {
     render(<EventList events={[]} empty="暂无事项" />);
 
     expect(screen.getByText("暂无事项")).toBeInTheDocument();
+  });
+
+  it("shows an error when quick completion fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ error: "事项不存在" }), { status: 404 }))
+    );
+
+    render(<EventList title="今日事项" events={[event]} />);
+
+    await userEvent.click(screen.getByLabelText("标记完成"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("事项不存在");
+    });
   });
 });
