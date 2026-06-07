@@ -50,6 +50,10 @@ export const eventQuerySchema = z.object({
   tag: z.string().trim().min(1).optional()
 });
 
+export const nonEmptyEventPatchSchema = eventPatchSchema.refine((value) => Object.keys(value).length > 0, {
+  message: "至少提供一个要修改的字段"
+});
+
 export const aiActionDataSchema = eventObjectSchema.partial().extend({
   tags: z.array(z.string().trim().min(1).max(30)).max(12).optional()
 });
@@ -95,6 +99,7 @@ export const loginRequestSchema = z.object({
 
 export type EventMutationInput = z.infer<typeof eventMutationSchema>;
 export type EventPatchInput = z.infer<typeof eventPatchSchema>;
+export type NonEmptyEventPatchInput = z.infer<typeof nonEmptyEventPatchSchema>;
 export type EventQueryInput = z.infer<typeof eventQuerySchema>;
 export type AiAction = z.infer<typeof aiActionSchema>;
 export type AiParseResult = z.infer<typeof aiParseResultSchema>;

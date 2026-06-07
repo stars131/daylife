@@ -15,7 +15,7 @@ CREATE TABLE "Event" (
     "reminderAt" DATETIME,
     "parentId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Event_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Event" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CHECK ("status" IN ('TODO', 'DOING', 'DONE', 'CANCELLED')),
     CHECK ("endAt" IS NULL OR "startAt" IS NULL OR "endAt" >= "startAt"),

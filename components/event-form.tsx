@@ -77,7 +77,7 @@ function buildPayload(state: EventFormState) {
   };
 }
 
-export function EventForm({ event }: { event?: SerializedEvent }) {
+export function EventForm({ event, timezone }: { event?: SerializedEvent; timezone: string }) {
   const router = useRouter();
   const [state, setState] = useState<EventFormState>(() => initialState(event));
   const [error, setError] = useState("");
@@ -174,6 +174,7 @@ export function EventForm({ event }: { event?: SerializedEvent }) {
       <div className="grid gap-4 rounded-lg border border-line bg-white p-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-ink">
           开始时间
+          <span className="ml-1 text-xs font-normal text-muted">保存后按 {timezone} 展示</span>
           <input
             type="datetime-local"
             value={state.startAt}
@@ -183,6 +184,7 @@ export function EventForm({ event }: { event?: SerializedEvent }) {
         </label>
         <label className="text-sm font-medium text-ink">
           结束时间
+          <span className="ml-1 text-xs font-normal text-muted">保存后按 {timezone} 展示</span>
           <input
             type="datetime-local"
             value={state.endAt}
@@ -192,6 +194,7 @@ export function EventForm({ event }: { event?: SerializedEvent }) {
         </label>
         <label className="text-sm font-medium text-ink">
           提醒时间
+          <span className="ml-1 text-xs font-normal text-muted">保存后按 {timezone} 展示</span>
           <input
             type="datetime-local"
             value={state.reminderAt}

@@ -26,6 +26,7 @@ export type SerializedEvent = {
 };
 
 type EventRecord = Prisma.EventGetPayload<object>;
+const unfinishedStatuses = ["TODO", "DOING"] as const;
 
 export function parseTags(tags: string): string[] {
   try {
@@ -100,7 +101,7 @@ export function buildEventWhere(query: EventQueryInput): Prisma.EventWhereInput 
   if (query.scope) where.scope = query.scope;
   if (query.status) where.status = query.status;
   if (query.type) where.type = query.type;
-  if (query.tag) where.tags = { contains: query.tag };
+  if (query.tag) where.tags = { contains: JSON.stringify(query.tag) };
 
   return where;
 }
@@ -110,7 +111,8 @@ export async function listEvents(query: EventQueryInput = {}): Promise<Serialize
     where: buildEventWhere(query),
     orderBy: [{ startAt: "asc" }, { createdAt: "desc" }]
   });
-  return events.map(serializeEvent);
+  const serialized = events.map(serializeEvent);
+  return query.tag ? serialized.filter((event) => event.tags.includes(query.tag as string)) : serialized;
 }
 
 export async function getEvent(id: string): Promise<SerializedEvent> {
@@ -136,6 +138,9 @@ export async function createEvent(input: EventMutationInput, db: EventDb = prism
 
 export async function updateEvent(id: string, input: EventPatchInput, db: EventDb = prisma): Promise<SerializedEvent> {
   await assertEventExists(id, db);
+  if (Object.keys(input).length === 0) {
+    throw new AppError("至少提供一个要修改的字段", 422, "EVENT_EMPTY_UPDATE");
+  }
   if (input.parentId !== undefined) {
     await assertParentChangeIsValid(id, input.parentId, db);
   }
@@ -267,19 +272,29 @@ export async function findRelevantEvents(input: string, limit = 20): Promise<Ser
   const where: Prisma.EventWhereInput =
     keywords.length > 0
       ? {
-          OR: keywords.flatMap((word) => [
-            { title: { contains: word } },
-            { description: { contains: word } },
-            { tags: { contains: word } }
-          ])
+          status: { in: [...unfinishedStatuses] },
+          OR: [
+            ...keywords.flatMap((word) => [{ title: { contains: word } }, { description: { contains: word } }, { tags: { contains: word } }]),
+            { scope: "LONG_TERM" },
+            { type: "GOAL" }
+          ]
         }
-      : {};
+      : { status: { in: [...unfinishedStatuses] } };
 
   const events = await prisma.event.findMany({
     where,
-    take: limit,
-    orderBy: [{ startAt: "asc" }, { updatedAt: "desc" }]
+    take: Math.min(limit * 2, 50),
+    orderBy: [{ status: "asc" }, { startAt: "asc" }, { updatedAt: "desc" }]
   });
 
-  return events.map(serializeEvent);
+  const serialized = events.map(serializeEvent);
+  const exactTagMatches = keywords.length > 0 ? serialized.filter((event) => event.tags.some((tag) => keywords.includes(tag))) : [];
+  const titleOrDescriptionMatches =
+    keywords.length > 0
+      ? serialized.filter((event) =>
+          keywords.some((word) => event.title.includes(word) || (event.description ? event.description.includes(word) : false))
+        )
+      : serialized;
+  const byId = new Map([...exactTagMatches, ...titleOrDescriptionMatches, ...serialized].map((event) => [event.id, event]));
+  return Array.from(byId.values()).slice(0, limit);
 }

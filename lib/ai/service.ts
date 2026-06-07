@@ -12,7 +12,7 @@ import {
   type SerializedEvent
 } from "@/lib/event-service";
 import { prisma } from "@/lib/prisma";
-import { aiParseResultSchema, eventMutationSchema, eventPatchSchema, type AiAction, type AiParseResult } from "@/lib/schemas";
+import { aiParseResultSchema, eventMutationSchema, nonEmptyEventPatchSchema, type AiAction, type AiParseResult } from "@/lib/schemas";
 import { parseStrictJson } from "@/lib/ai/json";
 import { scheduleSystemPrompt } from "@/lib/ai/prompts";
 
@@ -179,7 +179,7 @@ export async function confirmAiActions(actions: AiAction[], userInput = "", safe
           if (!action.data || Object.keys(action.data).length === 0) {
             throw new AppError("更新操作缺少修改内容", 422, "AI_UPDATE_DATA_INVALID", action);
           }
-          applied.push(await updateEvent(action.targetId, eventPatchSchema.parse(action.data), tx));
+          applied.push(await updateEvent(action.targetId, nonEmptyEventPatchSchema.parse(action.data), tx));
         } else if (action.action === "delete") {
           applied.push(await deleteEvent(action.targetId, tx));
         } else if (action.action === "complete") {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aiParseResultSchema, eventMutationSchema } from "@/lib/schemas";
+import { aiParseResultSchema, eventMutationSchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
 import { dayRange, formatIsoWithTimezone } from "@/lib/dates";
 
 describe("event schema", () => {
@@ -32,6 +32,10 @@ describe("event schema", () => {
         tags: []
       })
     ).toThrow();
+  });
+
+  it("rejects empty event patches", () => {
+    expect(() => nonEmptyEventPatchSchema.parse({})).toThrow();
   });
 });
 
