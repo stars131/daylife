@@ -31,6 +31,7 @@ type DeleteSnapshot = {
   children: SerializedEvent[];
 };
 const unfinishedStatuses = ["TODO", "DOING"] as const;
+const finishedStatuses = ["DONE", "CANCELLED"] as const;
 const priorityRank: Record<string, number> = {
   HIGH: 3,
   MEDIUM: 2,
@@ -291,28 +292,31 @@ export async function dashboardBuckets(now = getNow()): Promise<{
   const [today, overdue, weekItems, monthItems, goals] = await Promise.all([
     prisma.event.findMany({
       where: {
+        status: { notIn: [...finishedStatuses] },
         OR: [
           buildDateRangeOverlapWhere(day),
-          { scope: "DAY", status: { notIn: ["DONE", "CANCELLED"] } }
+          { scope: "DAY" }
         ]
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),
     prisma.event.findMany({
       where: {
-        status: { notIn: ["DONE", "CANCELLED"] },
+        status: { notIn: [...finishedStatuses] },
         OR: [{ endAt: { lt: now } }, { startAt: { lt: now }, endAt: null }]
       },
       orderBy: [{ startAt: "asc" }]
     }),
     prisma.event.findMany({
       where: {
+        status: { notIn: [...finishedStatuses] },
         OR: [buildDateRangeOverlapWhere(week), { scope: "WEEK" }]
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),
     prisma.event.findMany({
       where: {
+        status: { notIn: [...finishedStatuses] },
         OR: [buildDateRangeOverlapWhere(month), { scope: "MONTH" }]
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]

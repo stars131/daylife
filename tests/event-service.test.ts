@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildEventWhere, dashboardBuckets, deleteEvent, parseTags, updateEvent, type SerializedEvent } from "@/lib/event-service";
 
 vi.mock("@/lib/prisma", () => ({
@@ -8,6 +8,10 @@ vi.mock("@/lib/prisma", () => ({
     }
   }
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 function event(overrides: Partial<SerializedEvent>): SerializedEvent {
   return {
@@ -165,5 +169,28 @@ describe("dashboard ordering", () => {
     const buckets = await dashboardBuckets(new Date("2026-06-08T01:00:00.000Z"));
 
     expect(buckets.today.map((item) => item.id)).toEqual(["high", "low"]);
+  });
+
+  it("excludes finished items from dashboard task buckets", async () => {
+    const { prisma } = await import("@/lib/prisma");
+
+    vi.mocked(prisma.event.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never);
+
+    await dashboardBuckets(new Date("2026-06-08T01:00:00.000Z"));
+
+    expect(vi.mocked(prisma.event.findMany).mock.calls[0]?.[0]).toMatchObject({
+      where: { status: { notIn: ["DONE", "CANCELLED"] } }
+    });
+    expect(vi.mocked(prisma.event.findMany).mock.calls[2]?.[0]).toMatchObject({
+      where: { status: { notIn: ["DONE", "CANCELLED"] } }
+    });
+    expect(vi.mocked(prisma.event.findMany).mock.calls[3]?.[0]).toMatchObject({
+      where: { status: { notIn: ["DONE", "CANCELLED"] } }
+    });
   });
 });
