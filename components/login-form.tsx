@@ -3,6 +3,7 @@
 import { LockKeyhole } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { safeRedirectPath } from "@/lib/redirects";
 
 export function LoginForm() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export function LoginForm() {
         throw new Error(data.error || "登录失败");
       }
 
-      router.replace(searchParams.get("next") || "/");
+      router.replace(safeRedirectPath(searchParams.get("next")));
       router.refresh();
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : "登录失败");

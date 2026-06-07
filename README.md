@@ -45,6 +45,7 @@ npm run dev
 - `LLM_MODEL`：模型名，默认 `gemini-2.5-flash`。
 - `LLM_API_KEY`：只在服务端环境变量中配置。
 - `LLM_CHAT_COMPLETIONS_PATH`：默认 `/v1/chat/completions`。
+- `LLM_TIMEOUT_MS`：AI 请求超时时间，默认 `30000`。
 - `DATABASE_URL`：SQLite 路径，Docker 中使用 `file:/app/data/prod.db`。
 
 生成 bcrypt 哈希示例：

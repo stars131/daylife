@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "@/lib/errors";
 import { parseStrictJson } from "@/lib/ai/json";
-import { confirmAiActions, validateAiBusinessRules } from "@/lib/ai/service";
+import { confirmAiActions, parseScheduleInput, validateAiBusinessRules } from "@/lib/ai/service";
 import type { SerializedEvent } from "@/lib/event-service";
 
 vi.mock("@/lib/prisma", () => ({
@@ -46,6 +46,14 @@ vi.mock("@/lib/prisma", () => ({
     }
   }
 }));
+
+vi.mock("@/lib/event-service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/event-service")>();
+  return {
+    ...actual,
+    findRelevantEvents: vi.fn(async () => [])
+  };
+});
 
 const existingEvent: SerializedEvent = {
   id: "event_1",
@@ -178,5 +186,26 @@ describe("AI confirmation execution", () => {
 
     expect(result.applied).toHaveLength(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AI upstream resilience", () => {
+  it("maps aborted LLM requests to an AI timeout error", async () => {
+    const originalFetch = global.fetch;
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+          init?.signal?.dispatchEvent(new Event("abort"));
+          throw new DOMException("aborted", "AbortError");
+        })
+      );
+
+      await expect(parseScheduleInput("明天提醒我交报告")).rejects.toMatchObject({
+        code: "AI_TIMEOUT"
+      });
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
   });
 });

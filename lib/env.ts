@@ -19,7 +19,8 @@ const llmEnvSchema = baseEnvSchema.extend({
   LLM_BASE_URL: z.string().url().default("https://x666.me"),
   LLM_MODEL: z.string().min(1).default("gemini-2.5-flash"),
   LLM_API_KEY: z.string().min(1),
-  LLM_CHAT_COMPLETIONS_PATH: z.string().startsWith("/").default("/v1/chat/completions")
+  LLM_CHAT_COMPLETIONS_PATH: z.string().startsWith("/").default("/v1/chat/completions"),
+  LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).default(30000)
 });
 
 const serverEnvSchema = authEnvSchema.merge(llmEnvSchema);

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SESSION_COOKIE_NAME } from "@/lib/constants";
+import { safeRedirectPath } from "@/lib/redirects";
 
 const publicPaths = ["/login"];
 const publicApiPaths = ["/api/auth/login"];
@@ -45,7 +46,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("next", pathname);
+  loginUrl.searchParams.set("next", safeRedirectPath(`${pathname}${request.nextUrl.search}`));
   return NextResponse.redirect(loginUrl);
 }
 

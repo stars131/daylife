@@ -10,5 +10,6 @@ Object.assign(process.env, {
   LLM_MODEL: "gemini-2.5-flash",
   LLM_API_KEY: "test-placeholder",
   LLM_CHAT_COMPLETIONS_PATH: "/v1/chat/completions",
+  LLM_TIMEOUT_MS: "30000",
   DATABASE_URL: "file:./test.db"
 });

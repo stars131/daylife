@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aiParseResultSchema, eventMutationSchema, eventQuerySchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
 import { dateParamToRange, dayRange, formatIsoWithTimezone } from "@/lib/dates";
+import { safeRedirectPath } from "@/lib/redirects";
 import { dateTimeInputToIso, formatDateTimeInput, isValidTimezone } from "@/lib/timezone";
 
 describe("event schema", () => {
@@ -70,6 +71,18 @@ describe("AI parse schema", () => {
     });
 
     expect(parsed.actions[0].data?.title).toBe("健身");
+  });
+});
+
+describe("safe redirects", () => {
+  it("allows internal paths with query strings", () => {
+    expect(safeRedirectPath("/calendar?view=week")).toBe("/calendar?view=week");
+  });
+
+  it("rejects external or malformed redirect targets", () => {
+    expect(safeRedirectPath("https://example.com")).toBe("/");
+    expect(safeRedirectPath("//example.com/path")).toBe("/");
+    expect(safeRedirectPath("/\\evil")).toBe("/");
   });
 });
 

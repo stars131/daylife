@@ -79,22 +79,36 @@ export async function parseScheduleInput(input: string): Promise<AiParseResult &
   };
 
   const endpoint = new URL(env.LLM_CHAT_COMPLETIONS_PATH, env.LLM_BASE_URL).toString();
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${env.LLM_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: env.LLM_MODEL,
-      temperature: 0.1,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: scheduleSystemPrompt },
-        { role: "user", content: JSON.stringify(userPrompt) }
-      ]
-    })
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), env.LLM_TIMEOUT_MS);
+  let response: Response;
+
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.LLM_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: env.LLM_MODEL,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: scheduleSystemPrompt },
+          { role: "user", content: JSON.stringify(userPrompt) }
+        ]
+      })
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new AppError("AI 服务响应超时", 504, "AI_TIMEOUT");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new AppError("AI 服务调用失败", 502, "AI_HTTP_ERROR", { status: response.status });
@@ -119,6 +133,10 @@ export async function parseScheduleInput(input: string): Promise<AiParseResult &
   });
 
   return { ...checked, existingEvents, rawResponse };
+}
+
+function isAbortError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
 }
 
 export function validateAiBusinessRules(result: AiParseResult, existingEvents: SerializedEvent[]): AiParseResult {

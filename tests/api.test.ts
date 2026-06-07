@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as listEvents, POST as createEventRoute } from "@/app/api/events/route";
 import { POST as confirmAiRoute } from "@/app/api/ai/confirm-actions/route";
+import { POST as loginRoute } from "@/app/api/auth/login/route";
 
 vi.mock("@/lib/auth", () => ({
-  requireSession: vi.fn(async () => ({ role: "admin" }))
+  createSessionToken: vi.fn(async () => "test-token"),
+  requireSession: vi.fn(async () => ({ role: "admin" })),
+  setSessionCookie: vi.fn(),
+  verifyAdminPassword: vi.fn(async (password) => password === "correct-password")
 }));
 
 vi.mock("@/lib/event-service", () => ({
@@ -82,6 +86,19 @@ describe("events API", () => {
 
     expect(response.status).toBe(422);
   });
+
+  it("returns a client error for malformed JSON", async () => {
+    const request = new Request("http://localhost/api/events", {
+      method: "POST",
+      body: "{"
+    });
+
+    const response = await createEventRoute(request);
+    const body = (await response.json()) as { code: string };
+
+    expect(response.status).toBe(400);
+    expect(body.code).toBe("INVALID_JSON");
+  });
 });
 
 describe("AI confirm API", () => {
@@ -109,5 +126,82 @@ describe("AI confirm API", () => {
 
     expect(response.status).toBe(200);
     expect(confirmAiActions).toHaveBeenCalledWith(expect.any(Array), "删除牙医预约", true);
+  });
+});
+
+describe("auth API", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { resetRateLimitsForTests } = await import("@/lib/rate-limit");
+    resetRateLimitsForTests();
+  });
+
+  it("rate limits repeated failed logins by client", async () => {
+    for (let index = 0; index < 5; index += 1) {
+      const response = await loginRoute(
+        new Request("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: { "x-forwarded-for": "203.0.113.10" },
+          body: JSON.stringify({ password: "wrong-password" })
+        })
+      );
+      expect(response.status).toBe(401);
+    }
+
+    const blocked = await loginRoute(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-forwarded-for": "203.0.113.10" },
+        body: JSON.stringify({ password: "wrong-password" })
+      })
+    );
+    const body = (await blocked.json()) as { code: string };
+
+    expect(blocked.status).toBe(429);
+    expect(body.code).toBe("RATE_LIMITED");
+  });
+
+  it("clears failed login attempts after a successful login", async () => {
+    const client = "203.0.113.11";
+    const failed = await loginRoute(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-forwarded-for": client },
+        body: JSON.stringify({ password: "wrong-password" })
+      })
+    );
+    expect(failed.status).toBe(401);
+
+    const successful = await loginRoute(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-forwarded-for": client },
+        body: JSON.stringify({ password: "correct-password" })
+      })
+    );
+
+    expect(successful.status).toBe(200);
+  });
+
+  it("separates login limits by client", async () => {
+    for (let index = 0; index < 5; index += 1) {
+      await loginRoute(
+        new Request("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: { "x-forwarded-for": "203.0.113.12" },
+          body: JSON.stringify({ password: "wrong-password" })
+        })
+      );
+    }
+
+    const differentClient = await loginRoute(
+      new Request("http://localhost/api/auth/login", {
+        method: "POST",
+        headers: { "x-forwarded-for": "203.0.113.13" },
+        body: JSON.stringify({ password: "wrong-password" })
+      })
+    );
+
+    expect(differentClient.status).toBe(401);
   });
 });

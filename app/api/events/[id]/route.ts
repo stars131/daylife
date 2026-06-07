@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { deleteEventWithAudit, getEvent, updateEvent } from "@/lib/event-service";
 import { toErrorResponse } from "@/lib/errors";
+import { parseJsonRequest } from "@/lib/request";
 import { nonEmptyEventPatchSchema } from "@/lib/schemas";
 
 const paramsSchema = z.object({ id: z.string().min(1) });
@@ -22,7 +23,7 @@ export async function PATCH(request: Request, context: { params: { id: string } 
   try {
     await requireSession();
     const { id } = paramsSchema.parse(context.params);
-    const input = nonEmptyEventPatchSchema.parse(await request.json());
+    const input = await parseJsonRequest(request, nonEmptyEventPatchSchema);
     return NextResponse.json({ event: await updateEvent(id, input) });
   } catch (error) {
     const response = toErrorResponse(error);
