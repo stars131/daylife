@@ -209,3 +209,49 @@ describe("AI upstream resilience", () => {
     }
   });
 });
+
+describe("AI prompt context", () => {
+  it("sends the current time in the configured app timezone", async () => {
+    const originalFetch = global.fetch;
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-08T01:30:00.000Z"));
+
+    try {
+      const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    clarificationNeeded: false,
+                    clarificationQuestion: null,
+                    actions: []
+                  })
+                }
+              }
+            ]
+          }),
+          { status: 200 }
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await parseScheduleInput("明天提醒我交报告");
+
+      const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+        messages: Array<{ role: string; content: string }>;
+      };
+      const userPrompt = JSON.parse(body.messages.find((message) => message.role === "user")?.content ?? "{}") as {
+        currentDateTime: string;
+        timezone: string;
+      };
+
+      expect(userPrompt.timezone).toBe("Australia/Perth");
+      expect(userPrompt.currentDateTime).toBe("2026-06-08T09:30:00+08:00");
+    } finally {
+      vi.useRealTimers();
+      vi.stubGlobal("fetch", originalFetch);
+    }
+  });
+});

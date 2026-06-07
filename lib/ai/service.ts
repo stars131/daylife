@@ -1,5 +1,6 @@
 import { LOW_CONFIDENCE_THRESHOLD, unsafeAiActionKinds } from "@/lib/constants";
 import { getAppTimezone, getLlmEnv } from "@/lib/env";
+import { formatIsoWithTimezone } from "@/lib/dates";
 import { AppError } from "@/lib/errors";
 import {
   assertEventExists,
@@ -29,8 +30,8 @@ export type ConfirmResult = {
   skipped: Array<{ action: AiAction; reason: string }>;
 };
 
-function currentDateTimeWithOffset(): string {
-  return new Date().toISOString();
+function currentDateTimeWithOffset(timezone: string): string {
+  return formatIsoWithTimezone(new Date(), timezone);
 }
 
 function assertTargetedAction(action: AiAction): asserts action is AiAction & { targetId: string } {
@@ -59,10 +60,11 @@ function assertSafeToExecute(action: AiAction, safetyAcknowledged: boolean): voi
 
 export async function parseScheduleInput(input: string): Promise<AiParseResult & { existingEvents: SerializedEvent[]; rawResponse: string }> {
   const env = getLlmEnv();
+  const timezone = getAppTimezone();
   const existingEvents = await findRelevantEvents(input);
   const userPrompt = {
-    currentDateTime: currentDateTimeWithOffset(),
-    timezone: getAppTimezone(),
+    currentDateTime: currentDateTimeWithOffset(timezone),
+    timezone,
     userInput: input,
     existingEvents: existingEvents.map((event) => ({
       id: event.id,
