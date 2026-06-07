@@ -27,6 +27,11 @@ export type SerializedEvent = {
 
 type EventRecord = Prisma.EventGetPayload<object>;
 const unfinishedStatuses = ["TODO", "DOING"] as const;
+const priorityRank: Record<string, number> = {
+  HIGH: 3,
+  MEDIUM: 2,
+  LOW: 1
+};
 
 export function parseTags(tags: string): string[] {
   try {
@@ -47,6 +52,40 @@ export function serializeEvent(event: EventRecord): SerializedEvent {
     createdAt: event.createdAt.toISOString(),
     updatedAt: event.updatedAt.toISOString()
   };
+}
+
+function effectiveStartMs(event: SerializedEvent): number {
+  return event.startAt ? new Date(event.startAt).getTime() : Number.POSITIVE_INFINITY;
+}
+
+function createdAtMs(event: SerializedEvent): number {
+  return new Date(event.createdAt).getTime();
+}
+
+function updatedAtMs(event: SerializedEvent): number {
+  return new Date(event.updatedAt).getTime();
+}
+
+function compareByStartAscCreatedDesc(left: SerializedEvent, right: SerializedEvent): number {
+  return effectiveStartMs(left) - effectiveStartMs(right) || createdAtMs(right) - createdAtMs(left);
+}
+
+function compareByStartAscPriorityDesc(left: SerializedEvent, right: SerializedEvent): number {
+  return effectiveStartMs(left) - effectiveStartMs(right) || (priorityRank[right.priority] ?? 0) - (priorityRank[left.priority] ?? 0) || createdAtMs(right) - createdAtMs(left);
+}
+
+function compareByPriorityDescCreatedDesc(left: SerializedEvent, right: SerializedEvent): number {
+  return (priorityRank[right.priority] ?? 0) - (priorityRank[left.priority] ?? 0) || createdAtMs(right) - createdAtMs(left);
+}
+
+function compareRelevantEvents(left: SerializedEvent, right: SerializedEvent): number {
+  return left.status.localeCompare(right.status) || effectiveStartMs(left) - effectiveStartMs(right) || updatedAtMs(right) - updatedAtMs(left);
+}
+
+function assertResolvedDateOrder(startAt: Date | null, endAt: Date | null): void {
+  if (startAt && endAt && endAt.getTime() < startAt.getTime()) {
+    throw new AppError("结束时间不能早于开始时间", 422, "EVENT_INVALID_DATE_ORDER");
+  }
 }
 
 function toCreateData(input: EventMutationInput): Prisma.EventUncheckedCreateInput {
@@ -120,7 +159,7 @@ export async function listEvents(query: EventQueryInput = {}): Promise<Serialize
     where: buildEventWhere(query),
     orderBy: [{ startAt: "asc" }, { createdAt: "desc" }]
   });
-  const serialized = events.map(serializeEvent);
+  const serialized = events.map(serializeEvent).sort(compareByStartAscCreatedDesc);
   return query.tag ? serialized.filter((event) => event.tags.includes(query.tag as string)) : serialized;
 }
 
@@ -138,6 +177,7 @@ async function getEventRecord(id: string, db: EventDb = prisma): Promise<EventRe
 }
 
 export async function createEvent(input: EventMutationInput, db: EventDb = prisma): Promise<SerializedEvent> {
+  assertResolvedDateOrder(input.startAt ? new Date(input.startAt) : null, input.endAt ? new Date(input.endAt) : null);
   if (input.parentId) {
     await assertEventExists(input.parentId, db);
   }
@@ -146,10 +186,14 @@ export async function createEvent(input: EventMutationInput, db: EventDb = prism
 }
 
 export async function updateEvent(id: string, input: EventPatchInput, db: EventDb = prisma): Promise<SerializedEvent> {
-  await assertEventExists(id, db);
+  const existing = await getEventRecord(id, db);
   if (Object.keys(input).length === 0) {
     throw new AppError("至少提供一个要修改的字段", 422, "EVENT_EMPTY_UPDATE");
   }
+  const resolvedStartAt = input.startAt === undefined ? existing.startAt : input.startAt ? new Date(input.startAt) : null;
+  const resolvedEndAt = input.endAt === undefined ? existing.endAt : input.endAt ? new Date(input.endAt) : null;
+  assertResolvedDateOrder(resolvedStartAt, resolvedEndAt);
+
   if (input.parentId !== undefined) {
     await assertParentChangeIsValid(id, input.parentId, db);
   }
@@ -266,11 +310,11 @@ export async function dashboardBuckets(now = getNow()): Promise<{
   ]);
 
   return {
-    today: today.map(serializeEvent),
-    overdue: overdue.map(serializeEvent),
-    week: weekItems.map(serializeEvent),
-    month: monthItems.map(serializeEvent),
-    goals: goals.map(serializeEvent)
+    today: today.map(serializeEvent).sort(compareByStartAscPriorityDesc),
+    overdue: overdue.map(serializeEvent).sort(compareByStartAscCreatedDesc),
+    week: weekItems.map(serializeEvent).sort(compareByStartAscPriorityDesc),
+    month: monthItems.map(serializeEvent).sort(compareByStartAscPriorityDesc),
+    goals: goals.map(serializeEvent).sort(compareByPriorityDescCreatedDesc)
   };
 }
 
@@ -307,6 +351,6 @@ export async function findRelevantEvents(input: string, limit = 20): Promise<Ser
           keywords.some((word) => event.title.includes(word) || (event.description ? event.description.includes(word) : false))
         )
       : serialized;
-  const byId = new Map([...exactTagMatches, ...titleOrDescriptionMatches, ...serialized].map((event) => [event.id, event]));
+  const byId = new Map([...exactTagMatches, ...titleOrDescriptionMatches, ...serialized.sort(compareRelevantEvents)].map((event) => [event.id, event]));
   return Array.from(byId.values()).slice(0, limit);
 }
