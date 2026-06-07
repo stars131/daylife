@@ -15,11 +15,13 @@ export const viewport: Viewport = {
   themeColor: "#f8faf9"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const shell = await AppShell({ children });
+
   return (
     <html lang="zh-CN">
       <body>
-        <AppShell>{children}</AppShell>
+        {shell}
       </body>
     </html>
   );

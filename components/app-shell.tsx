@@ -2,9 +2,10 @@ import { cookies } from "next/headers";
 import { BottomNav } from "@/components/bottom-nav";
 import { LogoutButton } from "@/components/logout-button";
 import { SESSION_COOKIE_NAME } from "@/lib/constants";
+import { verifySessionToken } from "@/lib/auth";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
-  const hasSession = Boolean(cookies().get(SESSION_COOKIE_NAME)?.value);
+export async function AppShell({ children }: { children: React.ReactNode }) {
+  const hasSession = Boolean(await verifySessionToken(cookies().get(SESSION_COOKIE_NAME)?.value));
 
   return (
     <div className="min-h-screen bg-surface">

@@ -1,10 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { SESSION_COOKIE_NAME } from "@/lib/constants";
+import { isMutatingMethod, isSameOriginRequest } from "@/lib/origin";
 import { safeRedirectPath } from "@/lib/redirects";
 
 const publicPaths = ["/login"];
-const publicApiPaths = ["/api/auth/login"];
+const publicApiPaths = ["/api/auth/login", "/api/auth/logout"];
 
 function isPublicPath(pathname: string): boolean {
   return publicPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
@@ -31,6 +32,10 @@ async function hasValidSession(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/api/") && isMutatingMethod(request.method) && !isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "请求来源不可信", code: "FORBIDDEN_ORIGIN" }, { status: 403 });
+  }
 
   if (isPublicPath(pathname) || isPublicApiPath(pathname)) {
     return NextResponse.next();

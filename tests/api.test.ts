@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as listEvents, POST as createEventRoute } from "@/app/api/events/route";
 import { POST as confirmAiRoute } from "@/app/api/ai/confirm-actions/route";
 import { POST as loginRoute } from "@/app/api/auth/login/route";
+import { POST as logoutRoute } from "@/app/api/auth/logout/route";
 
 vi.mock("@/lib/auth", () => ({
+  clearSessionCookie: vi.fn(),
   createSessionToken: vi.fn(async () => "test-token"),
   requireSession: vi.fn(async () => ({ role: "admin" })),
   setSessionCookie: vi.fn(),
@@ -203,5 +205,15 @@ describe("auth API", () => {
     );
 
     expect(differentClient.status).toBe(401);
+  });
+
+  it("clears the session cookie on logout even without revalidating the session", async () => {
+    const { clearSessionCookie, requireSession } = await import("@/lib/auth");
+
+    const response = await logoutRoute();
+
+    expect(response.status).toBe(200);
+    expect(clearSessionCookie).toHaveBeenCalled();
+    expect(requireSession).not.toHaveBeenCalled();
   });
 });
