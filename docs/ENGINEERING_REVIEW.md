@@ -100,6 +100,10 @@
 
    原先列表中的快速完成按钮遇到 API 失败只会恢复按钮状态，不展示错误。用户在 session 过期、事项不存在或服务端校验失败时无法判断发生了什么。现在按钮会显示服务端错误信息，并保留成功后的刷新行为。
 
+25. Docker entrypoint 换行固定为 LF
+
+   项目在 Windows 环境开发，shell entrypoint 如果被检出为 CRLF，Linux 容器可能因 shebang 解析失败而无法启动。现在通过 `.gitattributes` 固定 `*.sh`、Dockerfile、Compose 和环境模板的 LF 换行，并用测试约束 `docker-entrypoint.sh` 不能含 CRLF。
+
 ## 当前架构评估
 
 - 前后端职责清晰：页面通过本项目 API 写数据，大模型只在服务端调用。
