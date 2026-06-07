@@ -2,6 +2,8 @@ import { z } from "zod";
 import { isValidTimezone } from "@/lib/timezone";
 
 const appTimezoneSchema = z.string().min(1).refine(isValidTimezone, "must be a valid IANA timezone");
+const bcryptHashSchema = z.string().regex(/^\$2[aby]\$(0[4-9]|[12]\d|3[01])\$[./A-Za-z0-9]{53}$/, "must be a valid bcrypt hash");
+const placeholderProtectedKeys = ["SESSION_SECRET", "ADMIN_PASSWORD_HASH", "LLM_API_KEY"] as const;
 
 const baseEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -12,7 +14,7 @@ const baseEnvSchema = z.object({
 
 const authEnvSchema = baseEnvSchema.extend({
   SESSION_SECRET: z.string().min(32),
-  ADMIN_PASSWORD_HASH: z.string().min(20)
+  ADMIN_PASSWORD_HASH: bcryptHashSchema
 });
 
 const llmEnvSchema = baseEnvSchema.extend({
@@ -35,7 +37,31 @@ function parseEnv<T extends z.ZodTypeAny>(schema: T, label: string): z.output<T>
     const message = parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
     throw new Error(`Invalid ${label} environment: ${message}`);
   }
+  assertNoProductionPlaceholders(parsed.data, label);
   return parsed.data;
+}
+
+function assertNoProductionPlaceholders(env: unknown, label: string): void {
+  if (!env || typeof env !== "object") {
+    return;
+  }
+
+  const values = env as Partial<Record<(typeof placeholderProtectedKeys)[number] | "NODE_ENV", unknown>>;
+  if (values.NODE_ENV !== "production") {
+    return;
+  }
+
+  for (const key of placeholderProtectedKeys) {
+    const value = values[key];
+    if (typeof value === "string" && isPlaceholderValue(value)) {
+      throw new Error(`Invalid ${label} environment: ${key}: must not use a placeholder value in production`);
+    }
+  }
+}
+
+function isPlaceholderValue(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith("replace-with-") || normalized === "test-placeholder";
 }
 
 export function getServerEnv(): ServerEnv {

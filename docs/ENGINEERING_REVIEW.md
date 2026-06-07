@@ -104,6 +104,10 @@
 
    项目在 Windows 环境开发，shell entrypoint 如果被检出为 CRLF，Linux 容器可能因 shebang 解析失败而无法启动。现在通过 `.gitattributes` 固定 `*.sh`、Dockerfile、Compose 和环境模板的 LF 换行，并用测试约束 `docker-entrypoint.sh` 不能含 CRLF。
 
+26. 生产环境拒绝占位符密钥和无效密码哈希
+
+   原先 `ADMIN_PASSWORD_HASH` 只校验长度，`.env.example` 里的占位符可能让应用启动后才表现为无法登录。现在管理员密码必须是合法 bcrypt 哈希，生产环境下 `SESSION_SECRET`、`ADMIN_PASSWORD_HASH`、`LLM_API_KEY` 不能使用明显占位符。
+
 ## 当前架构评估
 
 - 前后端职责清晰：页面通过本项目 API 写数据，大模型只在服务端调用。

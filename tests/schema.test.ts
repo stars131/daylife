@@ -1,9 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { buildCalendarViewHref, normalizeCalendarView } from "@/lib/calendar";
+import { getAuthEnv, getLlmEnv } from "@/lib/env";
 import { aiParseResultSchema, eventMutationSchema, eventQuerySchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
 import { dateParamToRange, dayRange, formatIsoWithTimezone } from "@/lib/dates";
 import { safeRedirectPath } from "@/lib/redirects";
 import { dateTimeInputToIso, formatDateTimeInput, isValidTimezone } from "@/lib/timezone";
+
+const originalEnv = { ...process.env };
+
+afterEach(() => {
+  for (const key of Object.keys(process.env)) {
+    if (!(key in originalEnv)) {
+      delete process.env[key];
+    }
+  }
+  Object.assign(process.env, originalEnv);
+});
 
 describe("event schema", () => {
   it("accepts a valid event mutation", () => {
@@ -137,5 +149,24 @@ describe("calendar URL helpers", () => {
   it("normalizes unknown calendar views to day", () => {
     expect(normalizeCalendarView("week")).toBe("week");
     expect(normalizeCalendarView("agenda")).toBe("day");
+  });
+});
+
+describe("environment validation", () => {
+  it("requires a real bcrypt admin password hash", () => {
+    process.env.ADMIN_PASSWORD_HASH = "replace-with-bcrypt-hash";
+
+    expect(() => getAuthEnv()).toThrow("ADMIN_PASSWORD_HASH");
+  });
+
+  it("rejects production placeholder LLM API keys", () => {
+    Object.assign(process.env, {
+      NODE_ENV: "production",
+      ADMIN_PASSWORD_HASH: "$2a$10$K8sGbWa8TZ.Kh0gWm8c0e.Ak2P5v4uCjG50UnkPGmBb2QvS8GAmDe",
+      SESSION_SECRET: "test-session-secret-with-at-least-32-bytes",
+      LLM_API_KEY: "replace-with-llm-api-key"
+    });
+
+    expect(() => getLlmEnv()).toThrow("LLM_API_KEY");
   });
 });
