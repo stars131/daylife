@@ -129,6 +129,32 @@ describe("AI confirm API", () => {
     expect(response.status).toBe(200);
     expect(confirmAiActions).toHaveBeenCalledWith(expect.any(Array), "删除牙医预约", true);
   });
+
+  it("does not coerce string false into a confirmed risky AI action", async () => {
+    const { confirmAiActions } = await import("@/lib/ai/service");
+    const request = new Request("http://localhost/api/ai/confirm-actions", {
+      method: "POST",
+      body: JSON.stringify({
+        userInput: "删除牙医预约",
+        safetyAcknowledged: "false",
+        actions: [
+          {
+            action: "delete",
+            targetId: "event_1",
+            matchQuery: null,
+            data: null,
+            confidence: 0.95,
+            reason: "用户确认删除"
+          }
+        ]
+      })
+    });
+
+    const response = await confirmAiRoute(request);
+
+    expect(response.status).toBe(200);
+    expect(confirmAiActions).toHaveBeenCalledWith(expect.any(Array), "删除牙医预约", false);
+  });
 });
 
 describe("auth API", () => {

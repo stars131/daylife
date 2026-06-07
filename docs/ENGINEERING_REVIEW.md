@@ -80,6 +80,10 @@
 
    原先传给模型的 `currentDateTime` 是 UTC `toISOString()`，但 prompt 要求结合 `timezone` 计算“今天/明天”。在日期临界点可能导致模型按 UTC 日期理解。现在发送的是 `APP_TIMEZONE` 对应的 ISO 偏移时间。
 
+20. 布尔输入禁止使用宽泛真值转换
+
+   `z.coerce.boolean()` 会把非空字符串 `"false"` 转成 `true`，这会影响 `allDay`，并可能让 AI 确认接口把 `safetyAcknowledged: "false"` 当成已确认风险操作。现在布尔 schema 只接受真实 boolean 或明确的 `"true"`/`"false"` 字符串。
+
 ## 当前架构评估
 
 - 前后端职责清晰：页面通过本项目 API 写数据，大模型只在服务端调用。

@@ -2,6 +2,22 @@ import { z } from "zod";
 import { AI_ACTIONS, EVENT_SCOPES, EVENT_STATUSES, EVENT_TYPES, PRIORITIES } from "@/lib/constants";
 
 const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);
+const stringBooleanToBoolean = (value: unknown) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+  if (normalized === "false") {
+    return false;
+  }
+  return value;
+};
+
+const strictBooleanSchema = z.preprocess(stringBooleanToBoolean, z.boolean());
 const nullableDateString = z
   .preprocess(emptyToUndefined, z.string().datetime({ offset: true }).nullable().optional())
   .transform((value) => value ?? null);
@@ -16,7 +32,7 @@ const eventObjectSchema = z.object({
   description: z.string().trim().max(2000).nullable().optional().transform((value) => value || null),
   startAt: nullableDateString,
   endAt: nullableDateString,
-  allDay: z.coerce.boolean().default(false),
+  allDay: strictBooleanSchema.default(false),
   type: eventTypeSchema.default("TASK"),
   scope: eventScopeSchema.default("DAY"),
   status: eventStatusSchema.default("TODO"),
@@ -100,7 +116,7 @@ export const aiParseRequestSchema = z.object({
 export const aiConfirmRequestSchema = z.object({
   userInput: z.string().trim().max(2000).optional().default(""),
   actions: z.array(aiActionSchema).min(1).max(10),
-  safetyAcknowledged: z.coerce.boolean().optional().default(false)
+  safetyAcknowledged: strictBooleanSchema.optional().default(false)
 });
 
 export const loginRequestSchema = z.object({

@@ -21,6 +21,12 @@ describe("event schema", () => {
     expect(parsed.tags).toEqual(["工作"]);
   });
 
+  it("parses explicit string booleans without treating every non-empty string as true", () => {
+    expect(eventMutationSchema.parse({ title: "全天测试", allDay: "false" }).allDay).toBe(false);
+    expect(eventMutationSchema.parse({ title: "全天测试", allDay: "true" }).allDay).toBe(true);
+    expect(() => eventMutationSchema.parse({ title: "全天测试", allDay: "yes" })).toThrow();
+  });
+
   it("rejects an end time before start time", () => {
     expect(() =>
       eventMutationSchema.parse({
