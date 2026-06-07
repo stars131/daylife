@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildCalendarViewHref, normalizeCalendarView } from "@/lib/calendar";
 import { aiParseResultSchema, eventMutationSchema, eventQuerySchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
 import { dateParamToRange, dayRange, formatIsoWithTimezone } from "@/lib/dates";
 import { safeRedirectPath } from "@/lib/redirects";
@@ -113,5 +114,28 @@ describe("timezone date utilities", () => {
   it("ignores invalid date query parameters before timezone conversion", () => {
     expect(dateParamToRange("not-a-date", "2026-06-08", "Australia/Perth")).toBeNull();
     expect(dateParamToRange("2026-06-10", "2026-06-08", "Australia/Perth")).toBeNull();
+  });
+});
+
+describe("calendar URL helpers", () => {
+  it("preserves filters while changing views without carrying stale date ranges", () => {
+    expect(
+      buildCalendarViewHref(
+        {
+          view: "day",
+          status: "TODO",
+          type: "TASK",
+          tag: " 工作 ",
+          from: "2026-06-01",
+          to: "2026-06-30"
+        },
+        "month"
+      )
+    ).toBe("/calendar?view=month&status=TODO&type=TASK&tag=%E5%B7%A5%E4%BD%9C");
+  });
+
+  it("normalizes unknown calendar views to day", () => {
+    expect(normalizeCalendarView("week")).toBe("week");
+    expect(normalizeCalendarView("agenda")).toBe("day");
   });
 });

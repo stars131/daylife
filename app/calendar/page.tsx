@@ -1,6 +1,7 @@
 import { CalendarFilters } from "@/components/calendar-filters";
 import { EventList } from "@/components/event-list";
 import { EmptyState } from "@/components/empty-state";
+import { buildCalendarViewHref, normalizeCalendarView } from "@/lib/calendar";
 import { dateParamToRange, dayRange, formatDateOnly, monthRange, weekRange } from "@/lib/dates";
 import { getAppTimezone } from "@/lib/env";
 import { listEvents } from "@/lib/event-service";
@@ -8,6 +9,12 @@ import { eventQuerySchema } from "@/lib/schemas";
 import { addLocalDays, getZonedDateTimeParts, type LocalDateParts } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
+
+const calendarViews = [
+  ["day", "日视图"],
+  ["week", "周视图"],
+  ["month", "月视图"]
+] as const;
 
 export default async function CalendarPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const normalized = Object.fromEntries(
@@ -37,14 +44,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
       </div>
 
       <div className="grid grid-cols-3 overflow-hidden rounded-lg border border-line bg-white">
-        {[
-          ["day", "日视图"],
-          ["week", "周视图"],
-          ["month", "月视图"]
-        ].map(([value, label]) => (
+        {calendarViews.map(([value, label]) => (
           <a
             key={value}
-            href={`/calendar?view=${value}`}
+            href={buildCalendarViewHref(normalized, value)}
             className={view === value ? "bg-accent px-3 py-2 text-center text-sm font-semibold text-white" : "px-3 py-2 text-center text-sm text-ink"}
           >
             {label}
@@ -89,8 +92,4 @@ function MonthGrid({ date, timezone }: { date: Date; timezone: string }) {
 
 function localWeekday(parts: LocalDateParts): number {
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
-}
-
-function normalizeCalendarView(value: unknown): "day" | "week" | "month" {
-  return value === "week" || value === "month" ? value : "day";
 }
