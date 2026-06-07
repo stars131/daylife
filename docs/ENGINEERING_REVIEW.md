@@ -84,6 +84,10 @@
 
    `z.coerce.boolean()` 会把非空字符串 `"false"` 转成 `true`，这会影响 `allDay`，并可能让 AI 确认接口把 `safetyAcknowledged: "false"` 当成已确认风险操作。现在布尔 schema 只接受真实 boolean 或明确的 `"true"`/`"false"` 字符串。
 
+21. AI 失败审计不再覆盖原始业务错误
+
+   AI 确认失败后会尝试写入 failed 日志。原先如果日志表写入也失败，最终抛出的会变成日志错误，掩盖真正的业务校验或事务回滚原因。现在失败审计是 best-effort，不会覆盖原始错误。
+
 ## 当前架构评估
 
 - 前后端职责清晰：页面通过本项目 API 写数据，大模型只在服务端调用。

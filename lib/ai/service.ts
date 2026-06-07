@@ -223,6 +223,13 @@ export async function confirmAiActions(actions: AiAction[], userInput = "", safe
 
     return result;
   } catch (error) {
+    await recordFailedAiActionLog(actions, userInput, error);
+    throw error;
+  }
+}
+
+async function recordFailedAiActionLog(actions: AiAction[], userInput: string, error: unknown): Promise<void> {
+  try {
     await prisma.aiActionLog.create({
       data: {
         userInput,
@@ -232,7 +239,8 @@ export async function confirmAiActions(actions: AiAction[], userInput = "", safe
         error: error instanceof Error ? error.message : "unknown error"
       }
     });
-    throw error;
+  } catch {
+    // Failure logging must not mask the business error that caused the rollback.
   }
 }
 

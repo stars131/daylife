@@ -187,6 +187,30 @@ describe("AI confirmation execution", () => {
     expect(result.applied).toHaveLength(1);
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
+
+  it("preserves the original business error when failure logging also fails", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    vi.mocked(prisma.aiActionLog.create).mockRejectedValueOnce(new Error("log unavailable") as never);
+
+    await expect(
+      confirmAiActions(
+        [
+          {
+            action: "update",
+            targetId: "event_1",
+            matchQuery: null,
+            data: null,
+            confidence: 0.95,
+            reason: ""
+          }
+        ],
+        "更新事项",
+        true
+      )
+    ).rejects.toMatchObject({
+      code: "AI_UPDATE_DATA_INVALID"
+    });
+  });
 });
 
 describe("AI upstream resilience", () => {
