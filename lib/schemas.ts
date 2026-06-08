@@ -26,6 +26,14 @@ const tagListSchema = z
   .array(tagSchema)
   .transform((tags) => Array.from(new Set(tags)))
   .pipe(z.array(tagSchema).max(12));
+const repeatRulePattern = /^FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)(;[A-Z][A-Z0-9_]*=[A-Z0-9_,+-]+)*$/;
+const emptyStringToUndefined = (value: unknown) => (typeof value === "string" && value.trim() === "" ? undefined : value);
+const repeatRuleSchema = z
+  .preprocess(
+    emptyStringToUndefined,
+    z.string().trim().max(200).regex(repeatRulePattern, "重复规则必须使用 RRULE 格式，例如 FREQ=WEEKLY;BYDAY=MO").nullable().optional()
+  )
+  .transform((value) => value ?? null);
 
 export const eventTypeSchema = z.enum(EVENT_TYPES);
 export const eventScopeSchema = z.enum(EVENT_SCOPES);
@@ -43,7 +51,7 @@ const eventObjectSchema = z.object({
   status: eventStatusSchema.default("TODO"),
   priority: prioritySchema.default("MEDIUM"),
   tags: tagListSchema.default([]),
-  repeatRule: z.string().trim().max(200).nullable().optional().transform((value) => value || null),
+  repeatRule: repeatRuleSchema,
   reminderAt: nullableDateString,
   parentId: z.string().trim().min(1).nullable().optional().transform((value) => value || null)
 });

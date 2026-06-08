@@ -49,6 +49,12 @@ describe("event schema", () => {
     expect(parsed.tags).toEqual(["工作", "生活"]);
   });
 
+  it("accepts only RRULE-like repeat rules", () => {
+    expect(eventMutationSchema.parse({ title: "重复测试", repeatRule: "FREQ=WEEKLY;BYDAY=MO" }).repeatRule).toBe("FREQ=WEEKLY;BYDAY=MO");
+    expect(eventMutationSchema.parse({ title: "重复测试", repeatRule: "" }).repeatRule).toBeNull();
+    expect(() => eventMutationSchema.parse({ title: "重复测试", repeatRule: "每周一" })).toThrow("重复规则必须使用 RRULE 格式");
+  });
+
   it("rejects an end time before start time", () => {
     expect(() =>
       eventMutationSchema.parse({
