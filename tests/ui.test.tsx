@@ -68,6 +68,55 @@ describe("EventList", () => {
 });
 
 describe("AiWorkbench", () => {
+  it("clears stale parsed actions when the input changes", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          clarificationNeeded: false,
+          clarificationQuestion: null,
+          actions: [
+            {
+              action: "create",
+              targetId: null,
+              matchQuery: null,
+              data: {
+                title: "交报告",
+                startAt: null,
+                endAt: null,
+                allDay: false,
+                type: "TASK",
+                scope: "DAY",
+                status: "TODO",
+                priority: "MEDIUM",
+                tags: []
+              },
+              confidence: 0.95,
+              reason: "用户要求新增"
+            }
+          ]
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AiWorkbench />);
+
+    const input = screen.getByPlaceholderText("输入自然语言日程请求");
+    await userEvent.type(input, "明天提醒我交报告");
+    await userEvent.click(screen.getByText("解析"));
+
+    await waitFor(() => {
+      expect(screen.getByText("待确认修改")).toBeInTheDocument();
+    });
+    expect(screen.getByText("交报告")).toBeInTheDocument();
+
+    await userEvent.type(input, "，改成买菜");
+
+    expect(screen.queryByText("待确认修改")).not.toBeInTheDocument();
+    expect(screen.queryByText("交报告")).not.toBeInTheDocument();
+  });
+
   it("does not allow confirmation while clarification is required", async () => {
     const fetchMock = vi.fn(async () =>
       new Response(

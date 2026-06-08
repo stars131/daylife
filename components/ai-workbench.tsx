@@ -36,6 +36,13 @@ export function AiWorkbench() {
   const [confirming, setConfirming] = useState(false);
   const [success, setSuccess] = useState("");
 
+  function updateInput(value: string) {
+    setInput(value);
+    setParsed(null);
+    setError("");
+    setSuccess("");
+  }
+
   async function parse() {
     setBusy(true);
     setError("");
@@ -103,7 +110,7 @@ export function AiWorkbench() {
         </div>
         <textarea
           value={input}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) => updateInput(event.target.value)}
           rows={5}
           placeholder="输入自然语言日程请求"
           className="w-full rounded-md border border-line px-3 py-2 text-base outline-none focus:border-accent focus:ring-2 focus:ring-teal-100"
@@ -113,7 +120,7 @@ export function AiWorkbench() {
             <button
               key={example}
               type="button"
-              onClick={() => setInput(example)}
+              onClick={() => updateInput(example)}
               className="rounded-md border border-line bg-slate-50 px-2.5 py-1.5 text-xs text-muted"
             >
               {example}
