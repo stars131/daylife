@@ -3,6 +3,7 @@
 import { Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { assertOkJson } from "@/lib/client-response";
 import type { SerializedEvent } from "@/lib/event-service";
 import { dateTimeInputToIso, formatDateTimeInput } from "@/lib/timezone";
 
@@ -86,9 +87,9 @@ export function EventForm({ event, timezone }: { event?: SerializedEvent; timezo
         body: JSON.stringify(buildPayload(state, timezone))
       });
 
-      const data = (await response.json()) as { event?: SerializedEvent; error?: string };
-      if (!response.ok || !data.event) {
-        throw new Error(data.error || "保存失败");
+      const data = await assertOkJson<{ event?: SerializedEvent }>(response, "保存失败");
+      if (!data.event) {
+        throw new Error("保存失败");
       }
 
       router.push(`/events/${data.event.id}`);
@@ -113,10 +114,7 @@ export function EventForm({ event, timezone }: { event?: SerializedEvent; timezo
     setError("");
     try {
       const response = await fetch(`/api/events/${event.id}`, { method: "DELETE" });
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "删除失败");
-      }
+      await assertOkJson<{ event?: SerializedEvent }>(response, "删除失败");
       router.push("/");
       router.refresh();
     } catch (deleteError) {

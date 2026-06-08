@@ -3,6 +3,7 @@
 import { AlertTriangle, Bot, CheckCircle2, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { assertOkJson } from "@/lib/client-response";
 import type { AiAction } from "@/lib/schemas";
 
 type ParseResponse = {
@@ -55,11 +56,15 @@ export function AiWorkbench() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input })
       });
-      const data = (await response.json()) as ParseResponse;
-      if (!response.ok) {
-        throw new Error(data.error || "AI 解析失败");
+      const data = await assertOkJson<ParseResponse>(response, "AI 解析失败");
+      if (typeof data.clarificationNeeded !== "boolean" || !Array.isArray(data.actions)) {
+        throw new Error("AI 解析失败");
       }
-      setParsed(data);
+      setParsed({
+        clarificationNeeded: data.clarificationNeeded,
+        clarificationQuestion: data.clarificationQuestion ?? null,
+        actions: data.actions
+      });
     } catch (parseError) {
       setError(parseError instanceof Error ? parseError.message : "AI 解析失败");
     } finally {
@@ -86,11 +91,11 @@ export function AiWorkbench() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userInput: input, actions: parsed.actions, safetyAcknowledged })
       });
-      const data = (await response.json()) as { applied?: unknown[]; error?: string };
-      if (!response.ok) {
-        throw new Error(data.error || "确认执行失败");
+      const data = await assertOkJson<{ applied?: unknown[] }>(response, "确认执行失败");
+      if (!Array.isArray(data.applied)) {
+        throw new Error("确认执行失败");
       }
-      setSuccess(`已执行 ${data.applied?.length ?? 0} 项修改`);
+      setSuccess(`已执行 ${data.applied.length} 项修改`);
       setParsed(null);
       setInput("");
       router.refresh();

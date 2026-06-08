@@ -3,6 +3,7 @@
 import { LockKeyhole } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { assertOkJson } from "@/lib/client-response";
 import { safeRedirectPath } from "@/lib/redirects";
 
 export function LoginForm() {
@@ -24,10 +25,7 @@ export function LoginForm() {
         body: JSON.stringify({ password })
       });
 
-      if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "登录失败");
-      }
+      await assertOkJson(response, "登录失败");
 
       router.replace(safeRedirectPath(searchParams.get("next")));
       router.refresh();

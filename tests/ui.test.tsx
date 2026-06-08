@@ -65,6 +65,18 @@ describe("EventList", () => {
       expect(screen.getByRole("alert")).toHaveTextContent("事项不存在");
     });
   });
+
+  it("shows a fallback error when quick completion returns non-JSON", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>Bad gateway</html>", { status: 502 })));
+
+    render(<EventList title="今日事项" events={[event]} />);
+
+    await userEvent.click(screen.getByLabelText("标记完成"));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("标记完成失败");
+    });
+  });
 });
 
 describe("AiWorkbench", () => {
@@ -115,6 +127,19 @@ describe("AiWorkbench", () => {
 
     expect(screen.queryByText("待确认修改")).not.toBeInTheDocument();
     expect(screen.queryByText("交报告")).not.toBeInTheDocument();
+  });
+
+  it("shows a fallback error when AI parsing returns non-JSON", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>Bad gateway</html>", { status: 502 })));
+
+    render(<AiWorkbench />);
+
+    await userEvent.type(screen.getByPlaceholderText("输入自然语言日程请求"), "明天提醒我交报告");
+    await userEvent.click(screen.getByText("解析"));
+
+    await waitFor(() => {
+      expect(screen.getByText("AI 解析失败")).toBeInTheDocument();
+    });
   });
 
   it("does not allow confirmation while clarification is required", async () => {

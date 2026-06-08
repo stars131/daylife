@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { assertOkJson } from "@/lib/client-response";
 
 export function QuickCompleteButton({ id, disabled }: { id: string; disabled?: boolean }) {
   const router = useRouter();
@@ -18,10 +19,7 @@ export function QuickCompleteButton({ id, disabled }: { id: string; disabled?: b
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "DONE" })
       });
-      if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(data.error || "标记完成失败");
-      }
+      await assertOkJson(response, "标记完成失败");
       router.refresh();
     } catch (completeError) {
       setError(completeError instanceof Error ? completeError.message : "标记完成失败");
