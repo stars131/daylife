@@ -159,6 +159,12 @@ export function buildDateRangeOverlapWhere(range: DateRange): Prisma.EventWhereI
   };
 }
 
+function buildDashboardRangeWhere(range: DateRange, scope: "DAY" | "WEEK" | "MONTH"): Prisma.EventWhereInput {
+  return {
+    OR: [buildDateRangeOverlapWhere(range), { scope, startAt: null, endAt: null }]
+  };
+}
+
 export async function listEvents(query: EventQueryInput = {}): Promise<SerializedEvent[]> {
   const events = await prisma.event.findMany({
     where: buildEventWhere(query),
@@ -293,10 +299,7 @@ export async function dashboardBuckets(now = getNow()): Promise<{
     prisma.event.findMany({
       where: {
         status: { notIn: [...finishedStatuses] },
-        OR: [
-          buildDateRangeOverlapWhere(day),
-          { scope: "DAY" }
-        ]
+        ...buildDashboardRangeWhere(day, "DAY")
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),
@@ -310,14 +313,14 @@ export async function dashboardBuckets(now = getNow()): Promise<{
     prisma.event.findMany({
       where: {
         status: { notIn: [...finishedStatuses] },
-        OR: [buildDateRangeOverlapWhere(week), { scope: "WEEK" }]
+        ...buildDashboardRangeWhere(week, "WEEK")
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),
     prisma.event.findMany({
       where: {
         status: { notIn: [...finishedStatuses] },
-        OR: [buildDateRangeOverlapWhere(month), { scope: "MONTH" }]
+        ...buildDashboardRangeWhere(month, "MONTH")
       },
       orderBy: [{ startAt: "asc" }, { priority: "desc" }]
     }),

@@ -193,4 +193,33 @@ describe("dashboard ordering", () => {
       where: { status: { notIn: ["DONE", "CANCELLED"] } }
     });
   });
+
+  it("uses scoped dashboard fallbacks only for unscheduled items", async () => {
+    const { prisma } = await import("@/lib/prisma");
+
+    vi.mocked(prisma.event.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never);
+
+    await dashboardBuckets(new Date("2026-06-08T01:00:00.000Z"));
+
+    expect(vi.mocked(prisma.event.findMany).mock.calls[0]?.[0]).toMatchObject({
+      where: {
+        OR: [expect.any(Object), { scope: "DAY", startAt: null, endAt: null }]
+      }
+    });
+    expect(vi.mocked(prisma.event.findMany).mock.calls[2]?.[0]).toMatchObject({
+      where: {
+        OR: [expect.any(Object), { scope: "WEEK", startAt: null, endAt: null }]
+      }
+    });
+    expect(vi.mocked(prisma.event.findMany).mock.calls[3]?.[0]).toMatchObject({
+      where: {
+        OR: [expect.any(Object), { scope: "MONTH", startAt: null, endAt: null }]
+      }
+    });
+  });
 });
