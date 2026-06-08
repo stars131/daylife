@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildEventWhere, dashboardBuckets, deleteEvent, parseTags, updateEvent, type SerializedEvent } from "@/lib/event-service";
+import { buildEventWhere, dashboardBuckets, deleteEvent, groupGoalEvents, parseTags, updateEvent, type SerializedEvent } from "@/lib/event-service";
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -150,6 +150,23 @@ describe("event deletion audit", () => {
     expect(snapshot.event.id).toBe("parent");
     expect(snapshot.children.map((item) => item.id)).toEqual(["child"]);
     expect(snapshot.children[0]?.parentId).toBe("parent");
+  });
+});
+
+describe("goal grouping", () => {
+  it("keeps goal page buckets aligned with goal semantics", () => {
+    const longTerm = event({ id: "long", type: "GOAL", scope: "LONG_TERM", tags: [] });
+    const yearGoal = event({ id: "year", type: "GOAL", scope: "MONTH", tags: ["年度"] });
+    const monthGoal = event({ id: "month", type: "GOAL", scope: "MONTH", tags: [] });
+    const monthlyTask = event({ id: "monthly-task", type: "TASK", scope: "MONTH", tags: [] });
+    const childTask = event({ id: "child-task", type: "TASK", parentId: "long" });
+
+    const groups = groupGoalEvents([longTerm, yearGoal, monthGoal, monthlyTask, childTask]);
+
+    expect(groups.longTerm.map((item) => item.id)).toEqual(["long"]);
+    expect(groups.yearGoals.map((item) => item.id)).toEqual(["year"]);
+    expect(groups.monthGoals.map((item) => item.id)).toEqual(["month"]);
+    expect(groups.taskGoals.map((item) => item.id)).toEqual(["child-task"]);
   });
 });
 

@@ -1,15 +1,11 @@
 import { EventList } from "@/components/event-list";
-import { listEvents } from "@/lib/event-service";
+import { groupGoalEvents, listEvents } from "@/lib/event-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function GoalsPage() {
-  const [longTerm, yearGoals, monthGoals, taskGoals] = await Promise.all([
-    listEvents({ scope: "LONG_TERM" }),
-    listEvents({ type: "GOAL" }),
-    listEvents({ scope: "MONTH" }),
-    listEvents({ type: "TASK" })
-  ]);
+  const [goals, tasks] = await Promise.all([listEvents({ type: "GOAL" }), listEvents({ type: "TASK" })]);
+  const { longTerm, yearGoals, monthGoals, taskGoals } = groupGoalEvents([...goals, ...tasks]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">

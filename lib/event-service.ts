@@ -30,6 +30,12 @@ type DeleteSnapshot = {
   event: SerializedEvent;
   children: SerializedEvent[];
 };
+export type GoalEventGroups = {
+  longTerm: SerializedEvent[];
+  yearGoals: SerializedEvent[];
+  monthGoals: SerializedEvent[];
+  taskGoals: SerializedEvent[];
+};
 const unfinishedStatuses = ["TODO", "DOING"] as const;
 const finishedStatuses = ["DONE", "CANCELLED"] as const;
 const priorityRank: Record<string, number> = {
@@ -172,6 +178,15 @@ export async function listEvents(query: EventQueryInput = {}): Promise<Serialize
   });
   const serialized = events.map(serializeEvent).sort(compareByStartAscCreatedDesc);
   return query.tag ? serialized.filter((event) => event.tags.includes(query.tag as string)) : serialized;
+}
+
+export function groupGoalEvents(events: SerializedEvent[]): GoalEventGroups {
+  return {
+    longTerm: events.filter((event) => event.type === "GOAL" && event.scope === "LONG_TERM"),
+    yearGoals: events.filter((event) => event.type === "GOAL" && event.scope !== "LONG_TERM" && event.tags.includes("年度")),
+    monthGoals: events.filter((event) => event.type === "GOAL" && event.scope === "MONTH" && !event.tags.includes("年度")),
+    taskGoals: events.filter((event) => event.type === "TASK" && Boolean(event.parentId))
+  };
 }
 
 export async function getEvent(id: string): Promise<SerializedEvent> {
