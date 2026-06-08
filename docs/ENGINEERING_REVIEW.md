@@ -108,6 +108,10 @@
 
    原先 `ADMIN_PASSWORD_HASH` 只校验长度，`.env.example` 里的占位符可能让应用启动后才表现为无法登录。现在管理员密码必须是合法 bcrypt 哈希，生产环境下 `SESSION_SECRET`、`ADMIN_PASSWORD_HASH`、`LLM_API_KEY` 不能使用明显占位符。
 
+27. AI 需要澄清时禁止直接确认执行
+
+   解析阶段已经会标记 `clarificationNeeded`，但前端仍允许点击确认执行，用户可能把模型明确表示不确定的 actions 直接提交。现在需要澄清时确认按钮禁用，必须先重新输入或获得明确 action 后再执行。
+
 ## 当前架构评估
 
 - 前后端职责清晰：页面通过本项目 API 写数据，大模型只在服务端调用。

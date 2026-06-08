@@ -61,7 +61,7 @@ export function AiWorkbench() {
   }
 
   async function confirm() {
-    if (!parsed?.actions.length) {
+    if (!parsed?.actions.length || parsed.clarificationNeeded) {
       return;
     }
 
@@ -180,7 +180,7 @@ export function AiWorkbench() {
           <button
             type="button"
             onClick={confirm}
-            disabled={confirming || parsed.actions.length === 0}
+            disabled={confirming || parsed.actions.length === 0 || parsed.clarificationNeeded}
             className="mt-4 touch-target w-full rounded-md bg-accent px-4 text-sm font-semibold text-white"
           >
             {confirming ? "执行中..." : "确认执行"}

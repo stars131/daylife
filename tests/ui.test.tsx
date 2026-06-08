@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AiWorkbench } from "@/components/ai-workbench";
 import { EventList } from "@/components/event-list";
 import type { SerializedEvent } from "@/lib/event-service";
 
@@ -62,5 +63,41 @@ describe("EventList", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("事项不存在");
     });
+  });
+});
+
+describe("AiWorkbench", () => {
+  it("does not allow confirmation while clarification is required", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          clarificationNeeded: true,
+          clarificationQuestion: "请确认具体事项",
+          actions: [
+            {
+              action: "complete",
+              targetId: null,
+              matchQuery: "读书任务",
+              data: null,
+              confidence: 0.9,
+              reason: "匹配不明确"
+            }
+          ]
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AiWorkbench />);
+
+    await userEvent.type(screen.getByPlaceholderText("输入自然语言日程请求"), "完成读书任务");
+    await userEvent.click(screen.getByText("解析"));
+
+    await waitFor(() => {
+      expect(screen.getByText("请确认具体事项")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("确认执行")).toBeDisabled();
   });
 });
