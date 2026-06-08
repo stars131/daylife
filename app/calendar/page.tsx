@@ -1,7 +1,7 @@
 import { CalendarFilters } from "@/components/calendar-filters";
 import { EventList } from "@/components/event-list";
 import { EmptyState } from "@/components/empty-state";
-import { buildCalendarViewHref, buildMonthGridDays, normalizeCalendarView } from "@/lib/calendar";
+import { buildCalendarViewHref, buildMonthGridDays, normalizeCalendarFilters, normalizeCalendarView } from "@/lib/calendar";
 import { dateParamToRange, dayRange, formatDateOnly, monthRange, weekRange } from "@/lib/dates";
 import { getAppTimezone } from "@/lib/env";
 import { listEvents } from "@/lib/event-service";
@@ -20,6 +20,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
     Object.entries(searchParams).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
   );
   const view = normalizeCalendarView(normalized.view);
+  const filters = normalizeCalendarFilters(normalized);
   const now = new Date();
   const timezone = getAppTimezone();
   const range =
@@ -27,7 +28,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
   const rangeFrom = formatDateOnly(range.from);
   const rangeTo = formatDateOnly(range.to);
   const query = eventQuerySchema.parse({
-    ...normalized,
+    ...filters,
     from: rangeFrom,
     to: rangeTo
   });
@@ -46,7 +47,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
         {calendarViews.map(([value, label]) => (
           <a
             key={value}
-            href={buildCalendarViewHref(normalized, value)}
+            href={buildCalendarViewHref(filters, value)}
             className={view === value ? "bg-accent px-3 py-2 text-center text-sm font-semibold text-white" : "px-3 py-2 text-center text-sm text-ink"}
           >
             {label}
@@ -54,7 +55,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
         ))}
       </div>
 
-      <CalendarFilters />
+      <CalendarFilters filters={filters} />
 
       {view === "month" ? <MonthGrid date={now} timezone={timezone} /> : null}
       <EventList title="事项列表" events={events} empty="当前范围没有事项" />

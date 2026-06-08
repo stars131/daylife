@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildCalendarViewHref, buildMonthGridDays, normalizeCalendarView } from "@/lib/calendar";
+import { buildCalendarViewHref, buildMonthGridDays, normalizeCalendarFilters, normalizeCalendarView } from "@/lib/calendar";
 import { getAuthEnv, getLlmEnv } from "@/lib/env";
 import { aiParseResultSchema, eventMutationSchema, eventQuerySchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
 import { dateParamToRange, dayRange, formatIsoWithTimezone } from "@/lib/dates";
@@ -164,6 +164,16 @@ describe("calendar helpers", () => {
   it("normalizes unknown calendar views to day", () => {
     expect(normalizeCalendarView("week")).toBe("week");
     expect(normalizeCalendarView("agenda")).toBe("day");
+  });
+
+  it("drops invalid calendar filters while preserving valid tag filters", () => {
+    expect(normalizeCalendarFilters({ status: "BAD", type: "NOPE", tag: " 工作 " })).toEqual({ tag: "工作" });
+  });
+
+  it("does not carry invalid filters into calendar view links", () => {
+    expect(buildCalendarViewHref({ status: "BAD", type: "TASK", tag: " 工作 " }, "week")).toBe(
+      "/calendar?view=week&type=TASK&tag=%E5%B7%A5%E4%BD%9C"
+    );
   });
 
   it("renders six calendar rows when a month spans six weeks", () => {

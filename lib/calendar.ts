@@ -1,8 +1,15 @@
+import { EVENT_STATUSES, EVENT_TYPES } from "@/lib/constants";
 import { addLocalDays, getZonedDateTimeParts, type LocalDateParts } from "@/lib/timezone";
 
 export type CalendarView = "day" | "week" | "month";
 
 const persistentFilterParams = ["status", "type", "tag"] as const;
+
+export type CalendarFilterParams = {
+  status?: string;
+  type?: string;
+  tag?: string;
+};
 
 export function normalizeCalendarView(value: unknown): CalendarView {
   return value === "week" || value === "month" ? value : "day";
@@ -11,17 +18,28 @@ export function normalizeCalendarView(value: unknown): CalendarView {
 export function buildCalendarViewHref(searchParams: Record<string, string | string[] | undefined>, view: CalendarView): string {
   const params = new URLSearchParams();
   params.set("view", view);
+  const filters = normalizeCalendarFilters(searchParams);
 
   for (const key of persistentFilterParams) {
-    const rawValue = searchParams[key];
-    const value = Array.isArray(rawValue) ? rawValue[0] : rawValue;
-    const normalizedValue = value?.trim();
+    const normalizedValue = filters[key];
     if (normalizedValue) {
       params.set(key, normalizedValue);
     }
   }
 
   return `/calendar?${params.toString()}`;
+}
+
+export function normalizeCalendarFilters(searchParams: Record<string, string | string[] | undefined>): CalendarFilterParams {
+  const status = firstSearchParam(searchParams.status)?.trim();
+  const type = firstSearchParam(searchParams.type)?.trim();
+  const tag = firstSearchParam(searchParams.tag)?.trim();
+
+  return {
+    ...(status && isOneOf(status, EVENT_STATUSES) ? { status } : {}),
+    ...(type && isOneOf(type, EVENT_TYPES) ? { type } : {}),
+    ...(tag ? { tag } : {})
+  };
 }
 
 export function buildMonthGridDays(date: Date, timezone: string): LocalDateParts[] {
@@ -52,4 +70,12 @@ function daysBetween(from: LocalDateParts, to: LocalDateParts): number {
   const fromUtc = Date.UTC(from.year, from.month - 1, from.day);
   const toUtc = Date.UTC(to.year, to.month - 1, to.day);
   return Math.round((toUtc - fromUtc) / 86400000);
+}
+
+function firstSearchParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isOneOf<T extends readonly string[]>(value: string, options: T): value is T[number] {
+  return options.includes(value);
 }

@@ -2,13 +2,22 @@
 
 import { Filter } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { CalendarFilterParams } from "@/lib/calendar";
 
-export function CalendarFilters() {
+export function CalendarFilters({ filters }: { filters: CalendarFilterParams }) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   function update(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
+    for (const filterKey of ["status", "type", "tag"]) {
+      params.delete(filterKey);
+    }
+    for (const [filterKey, filterValue] of Object.entries(filters)) {
+      if (filterValue) {
+        params.set(filterKey, filterValue);
+      }
+    }
     if (value) {
       params.set(key, value);
     } else {
@@ -26,7 +35,7 @@ export function CalendarFilters() {
       <div className="grid gap-3 sm:grid-cols-3">
         <select
           aria-label="状态"
-          value={searchParams.get("status") || ""}
+          value={filters.status || ""}
           onChange={(event) => update("status", event.target.value)}
           className="h-11 rounded-md border border-line bg-white px-3 text-sm"
         >
@@ -38,7 +47,7 @@ export function CalendarFilters() {
         </select>
         <select
           aria-label="类型"
-          value={searchParams.get("type") || ""}
+          value={filters.type || ""}
           onChange={(event) => update("type", event.target.value)}
           className="h-11 rounded-md border border-line bg-white px-3 text-sm"
         >
@@ -51,7 +60,7 @@ export function CalendarFilters() {
         <input
           aria-label="标签"
           placeholder="标签"
-          value={searchParams.get("tag") || ""}
+          value={filters.tag || ""}
           onChange={(event) => update("tag", event.target.value)}
           className="h-11 rounded-md border border-line bg-white px-3 text-sm"
         />

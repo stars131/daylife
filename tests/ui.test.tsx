@@ -1,15 +1,28 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiWorkbench } from "@/components/ai-workbench";
+import { CalendarFilters } from "@/components/calendar-filters";
 import { EventList } from "@/components/event-list";
 import type { SerializedEvent } from "@/lib/event-service";
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }),
-  usePathname: () => "/",
-  useSearchParams: () => new URLSearchParams()
+const navigationMocks = vi.hoisted(() => ({
+  push: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
+  searchParams: new URLSearchParams()
 }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: navigationMocks.refresh, push: navigationMocks.push, replace: navigationMocks.replace }),
+  usePathname: () => "/",
+  useSearchParams: () => navigationMocks.searchParams
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  navigationMocks.searchParams = new URLSearchParams();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -174,5 +187,17 @@ describe("AiWorkbench", () => {
     });
 
     expect(screen.getByText("确认执行")).toBeDisabled();
+  });
+});
+
+describe("CalendarFilters", () => {
+  it("cleans invalid URL filters when updating a filter", async () => {
+    navigationMocks.searchParams = new URLSearchParams("view=day&status=BAD&type=TASK&tag=%E5%B7%A5%E4%BD%9C");
+
+    render(<CalendarFilters filters={{ type: "TASK", tag: "工作" }} />);
+
+    await userEvent.selectOptions(screen.getByLabelText("类型"), "GOAL");
+
+    expect(navigationMocks.push).toHaveBeenCalledWith("/calendar?view=day&type=GOAL&tag=%E5%B7%A5%E4%BD%9C");
   });
 });
