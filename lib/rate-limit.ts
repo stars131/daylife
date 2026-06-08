@@ -19,6 +19,11 @@ const loginLimit = {
   windowMs: 15 * 60 * 1000
 } satisfies RateLimitOptions;
 
+const aiLimit = {
+  limit: 30,
+  windowMs: 60 * 1000
+} satisfies RateLimitOptions;
+
 function activeRecord(key: string, options: RateLimitOptions, now = Date.now()): RateLimitRecord {
   pruneExpiredRecords(now);
   const existing = records.get(key);
@@ -52,6 +57,10 @@ export function loginRateLimitKey(request: Request): string {
   return `login:${getClientIp(request)}`;
 }
 
+export function aiRateLimitKey(request: Request): string {
+  return `ai:${getClientIp(request)}`;
+}
+
 export function assertLoginAllowed(key: string): void {
   const record = activeRecord(key, loginLimit);
   if (record.count >= loginLimit.limit) {
@@ -68,6 +77,16 @@ export function recordFailedLogin(key: string): void {
 
 export function clearLoginFailures(key: string): void {
   records.delete(key);
+}
+
+export function assertAiRequestAllowed(key: string): void {
+  const record = activeRecord(key, aiLimit);
+  if (record.count >= aiLimit.limit) {
+    throw new AppError("AI 请求过于频繁，请稍后再试", 429, "RATE_LIMITED", {
+      retryAfterSeconds: retryAfterSeconds(record)
+    });
+  }
+  record.count += 1;
 }
 
 export function resetRateLimitsForTests(): void {

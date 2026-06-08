@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as listEvents, POST as createEventRoute } from "@/app/api/events/route";
 import { POST as confirmAiRoute } from "@/app/api/ai/confirm-actions/route";
+import { POST as parseAiRoute } from "@/app/api/ai/parse-schedule/route";
 import { POST as loginRoute } from "@/app/api/auth/login/route";
 import { POST as logoutRoute } from "@/app/api/auth/logout/route";
 
@@ -35,14 +36,22 @@ vi.mock("@/lib/event-service", () => ({
 }));
 
 vi.mock("@/lib/ai/service", () => ({
-  confirmAiActions: vi.fn(async () => ({ applied: [], skipped: [] }))
+  confirmAiActions: vi.fn(async () => ({ applied: [], skipped: [] })),
+  parseScheduleInput: vi.fn(async () => ({
+    clarificationNeeded: false,
+    clarificationQuestion: null,
+    actions: [],
+    existingEvents: []
+  }))
 }));
 
-describe("events API", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+beforeEach(async () => {
+  vi.clearAllMocks();
+  const { resetRateLimitsForTests } = await import("@/lib/rate-limit");
+  resetRateLimitsForTests();
+});
 
+describe("events API", () => {
   it("lists events with query validation", async () => {
     const response = await listEvents(new Request("http://localhost/api/events?status=TODO&type=TASK"));
     const body = (await response.json()) as { events: unknown[] };
@@ -155,15 +164,34 @@ describe("AI confirm API", () => {
     expect(response.status).toBe(200);
     expect(confirmAiActions).toHaveBeenCalledWith(expect.any(Array), "删除牙医预约", false);
   });
+
+  it("rate limits repeated AI parse requests by client", async () => {
+    for (let index = 0; index < 30; index += 1) {
+      const response = await parseAiRoute(
+        new Request("http://localhost/api/ai/parse-schedule", {
+          method: "POST",
+          headers: { "x-forwarded-for": "203.0.113.20" },
+          body: JSON.stringify({ input: "明天提醒我交报告" })
+        })
+      );
+      expect(response.status).toBe(200);
+    }
+
+    const blocked = await parseAiRoute(
+      new Request("http://localhost/api/ai/parse-schedule", {
+        method: "POST",
+        headers: { "x-forwarded-for": "203.0.113.20" },
+        body: JSON.stringify({ input: "明天提醒我交报告" })
+      })
+    );
+    const body = (await blocked.json()) as { code: string };
+
+    expect(blocked.status).toBe(429);
+    expect(body.code).toBe("RATE_LIMITED");
+  });
 });
 
 describe("auth API", () => {
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    const { resetRateLimitsForTests } = await import("@/lib/rate-limit");
-    resetRateLimitsForTests();
-  });
-
   it("rate limits repeated failed logins by client", async () => {
     for (let index = 0; index < 5; index += 1) {
       const response = await loginRoute(
