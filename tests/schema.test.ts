@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildCalendarViewHref, normalizeCalendarView } from "@/lib/calendar";
+import { buildCalendarViewHref, buildMonthGridDays, normalizeCalendarView } from "@/lib/calendar";
 import { getAuthEnv, getLlmEnv } from "@/lib/env";
 import { aiParseResultSchema, eventMutationSchema, eventQuerySchema, nonEmptyEventPatchSchema } from "@/lib/schemas";
 import { dateParamToRange, dayRange, formatIsoWithTimezone } from "@/lib/dates";
@@ -144,7 +144,7 @@ describe("timezone date utilities", () => {
   });
 });
 
-describe("calendar URL helpers", () => {
+describe("calendar helpers", () => {
   it("preserves filters while changing views without carrying stale date ranges", () => {
     expect(
       buildCalendarViewHref(
@@ -164,6 +164,21 @@ describe("calendar URL helpers", () => {
   it("normalizes unknown calendar views to day", () => {
     expect(normalizeCalendarView("week")).toBe("week");
     expect(normalizeCalendarView("agenda")).toBe("day");
+  });
+
+  it("renders six calendar rows when a month spans six weeks", () => {
+    const days = buildMonthGridDays(new Date("2026-08-15T00:00:00.000Z"), "Australia/Perth");
+
+    expect(days).toHaveLength(42);
+    expect(days[0]).toEqual({ year: 2026, month: 7, day: 27 });
+    expect(days[41]).toEqual({ year: 2026, month: 9, day: 6 });
+    expect(days).toContainEqual({ year: 2026, month: 8, day: 31 });
+  });
+
+  it("keeps at least five calendar rows for compact months", () => {
+    const days = buildMonthGridDays(new Date("2026-02-15T00:00:00.000Z"), "Australia/Perth");
+
+    expect(days).toHaveLength(35);
   });
 });
 

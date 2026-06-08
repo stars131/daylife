@@ -1,12 +1,11 @@
 import { CalendarFilters } from "@/components/calendar-filters";
 import { EventList } from "@/components/event-list";
 import { EmptyState } from "@/components/empty-state";
-import { buildCalendarViewHref, normalizeCalendarView } from "@/lib/calendar";
+import { buildCalendarViewHref, buildMonthGridDays, normalizeCalendarView } from "@/lib/calendar";
 import { dateParamToRange, dayRange, formatDateOnly, monthRange, weekRange } from "@/lib/dates";
 import { getAppTimezone } from "@/lib/env";
 import { listEvents } from "@/lib/event-service";
 import { eventQuerySchema } from "@/lib/schemas";
-import { addLocalDays, getZonedDateTimeParts, type LocalDateParts } from "@/lib/timezone";
 
 export const dynamic = "force-dynamic";
 
@@ -64,11 +63,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Rec
 }
 
 function MonthGrid({ date, timezone }: { date: Date; timezone: string }) {
-  const current = getZonedDateTimeParts(date, timezone);
-  const monthStart = { year: current.year, month: current.month, day: 1 };
-  const daysSinceMonday = (localWeekday(monthStart) + 6) % 7;
-  const gridStart = addLocalDays(monthStart, -daysSinceMonday);
-  const days = Array.from({ length: 35 }, (_, index) => addLocalDays(gridStart, index));
+  const days = buildMonthGridDays(date, timezone);
 
   if (days.length === 0) {
     return <EmptyState title="暂无日历数据" />;
@@ -88,8 +83,4 @@ function MonthGrid({ date, timezone }: { date: Date; timezone: string }) {
       ))}
     </div>
   );
-}
-
-function localWeekday(parts: LocalDateParts): number {
-  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
 }
