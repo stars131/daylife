@@ -232,6 +232,62 @@ describe("AI upstream resilience", () => {
       vi.stubGlobal("fetch", originalFetch);
     }
   });
+
+  it("returns validated parse results even when parse logging fails", async () => {
+    const { prisma } = await import("@/lib/prisma");
+    const originalFetch = global.fetch;
+    vi.mocked(prisma.aiActionLog.create).mockRejectedValueOnce(new Error("log unavailable") as never);
+
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          return new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify({
+                      clarificationNeeded: false,
+                      clarificationQuestion: null,
+                      actions: [
+                        {
+                          action: "create",
+                          targetId: null,
+                          matchQuery: null,
+                          data: {
+                            title: "交报告",
+                            startAt: null,
+                            endAt: null,
+                            allDay: false,
+                            type: "TASK",
+                            scope: "DAY",
+                            status: "TODO",
+                            priority: "MEDIUM",
+                            tags: []
+                          },
+                          confidence: 0.95,
+                          reason: ""
+                        }
+                      ]
+                    })
+                  }
+                }
+              ]
+            }),
+            { status: 200 }
+          );
+        })
+      );
+
+      const result = await parseScheduleInput("提醒我交报告");
+
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0]?.data?.title).toBe("交报告");
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
+  });
 });
 
 describe("AI prompt context", () => {

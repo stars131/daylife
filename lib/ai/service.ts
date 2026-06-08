@@ -125,14 +125,7 @@ export async function parseScheduleInput(input: string): Promise<AiParseResult &
   const parsed = aiParseResultSchema.parse(parseStrictJson(rawResponse));
   const checked = validateAiBusinessRules(parsed, existingEvents);
 
-  await prisma.aiActionLog.create({
-    data: {
-      userInput: input,
-      rawResponse,
-      actionsJson: JSON.stringify(checked.actions),
-      status: checked.clarificationNeeded ? "parsed_needs_clarification" : "parsed"
-    }
-  });
+  await recordParsedAiActionLog(input, rawResponse, checked);
 
   return { ...checked, existingEvents, rawResponse };
 }
@@ -174,6 +167,21 @@ export function validateAiBusinessRules(result: AiParseResult, existingEvents: S
     clarificationQuestion,
     actions
   };
+}
+
+async function recordParsedAiActionLog(input: string, rawResponse: string, result: AiParseResult): Promise<void> {
+  try {
+    await prisma.aiActionLog.create({
+      data: {
+        userInput: input,
+        rawResponse,
+        actionsJson: JSON.stringify(result.actions),
+        status: result.clarificationNeeded ? "parsed_needs_clarification" : "parsed"
+      }
+    });
+  } catch {
+    // Parse logging must not block returning already validated AI suggestions.
+  }
 }
 
 export async function confirmAiActions(actions: AiAction[], userInput = "", safetyAcknowledged = false): Promise<ConfirmResult> {
