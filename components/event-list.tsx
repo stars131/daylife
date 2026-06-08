@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Clock, Tag } from "lucide-react";
+import { Bell, Check, Clock, Tag } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { PriorityPill, StatusPill } from "@/components/status-pill";
 import { QuickCompleteButton } from "@/components/quick-complete-button";
@@ -51,6 +51,12 @@ export function EventList({
                   {formatDateTime(event.startAt)}
                 </span>
                 <span>{typeText[event.type] || event.type}</span>
+                {event.reminderAt ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Bell aria-hidden className="h-3.5 w-3.5" />
+                    提醒 {formatDateTime(event.reminderAt)}
+                  </span>
+                ) : null}
                 <StatusPill status={event.status} />
                 <PriorityPill priority={event.priority} />
               </div>

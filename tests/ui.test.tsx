@@ -28,7 +28,7 @@ const event: SerializedEvent = {
   priority: "HIGH",
   tags: ["工作"],
   repeatRule: null,
-  reminderAt: null,
+  reminderAt: "2026-06-08T06:30:00.000Z",
   parentId: null,
   createdAt: "2026-06-08T00:00:00.000Z",
   updatedAt: "2026-06-08T00:00:00.000Z"
@@ -41,6 +41,7 @@ describe("EventList", () => {
     expect(screen.getByText("今日事项")).toBeInTheDocument();
     expect(screen.getByText("提交报告")).toBeInTheDocument();
     expect(screen.getByText("工作")).toBeInTheDocument();
+    expect(screen.getByText(/提醒/)).toBeInTheDocument();
     expect(screen.getByLabelText("标记完成")).toBeInTheDocument();
   });
 
