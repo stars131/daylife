@@ -288,6 +288,20 @@ describe("AI upstream resilience", () => {
       vi.stubGlobal("fetch", originalFetch);
     }
   });
+
+  it("maps non-JSON LLM responses to an upstream response error", async () => {
+    const originalFetch = global.fetch;
+
+    try {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response("not-json", { status: 200 })));
+
+      await expect(parseScheduleInput("明天提醒我交报告")).rejects.toMatchObject({
+        code: "AI_INVALID_JSON"
+      });
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
+  });
 });
 
 describe("AI prompt context", () => {

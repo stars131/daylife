@@ -116,7 +116,7 @@ export async function parseScheduleInput(input: string): Promise<AiParseResult &
     throw new AppError("AI 服务调用失败", 502, "AI_HTTP_ERROR", { status: response.status });
   }
 
-  const payload = (await response.json()) as ChatCompletionResponse;
+  const payload = await parseChatCompletionResponse(response);
   const rawResponse = payload.choices?.[0]?.message?.content;
   if (!rawResponse) {
     throw new AppError("AI 响应缺少内容", 502, "AI_EMPTY_RESPONSE");
@@ -132,6 +132,14 @@ export async function parseScheduleInput(input: string): Promise<AiParseResult &
 
 function isAbortError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+}
+
+async function parseChatCompletionResponse(response: Response): Promise<ChatCompletionResponse> {
+  try {
+    return (await response.json()) as ChatCompletionResponse;
+  } catch {
+    throw new AppError("AI 响应不是合法 JSON", 502, "AI_INVALID_JSON");
+  }
 }
 
 export function validateAiBusinessRules(result: AiParseResult, existingEvents: SerializedEvent[]): AiParseResult {
