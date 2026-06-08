@@ -21,6 +21,11 @@ const strictBooleanSchema = z.preprocess(stringBooleanToBoolean, z.boolean());
 const nullableDateString = z
   .preprocess(emptyToUndefined, z.string().datetime({ offset: true }).nullable().optional())
   .transform((value) => value ?? null);
+const tagSchema = z.string().trim().min(1).max(30);
+const tagListSchema = z
+  .array(tagSchema)
+  .transform((tags) => Array.from(new Set(tags)))
+  .pipe(z.array(tagSchema).max(12));
 
 export const eventTypeSchema = z.enum(EVENT_TYPES);
 export const eventScopeSchema = z.enum(EVENT_SCOPES);
@@ -37,7 +42,7 @@ const eventObjectSchema = z.object({
   scope: eventScopeSchema.default("DAY"),
   status: eventStatusSchema.default("TODO"),
   priority: prioritySchema.default("MEDIUM"),
-  tags: z.array(z.string().trim().min(1).max(30)).max(12).default([]),
+  tags: tagListSchema.default([]),
   repeatRule: z.string().trim().max(200).nullable().optional().transform((value) => value || null),
   reminderAt: nullableDateString,
   parentId: z.string().trim().min(1).nullable().optional().transform((value) => value || null)
@@ -81,7 +86,7 @@ export const nonEmptyEventPatchSchema = eventPatchSchema.refine((value) => Objec
 });
 
 export const aiActionDataSchema = eventObjectSchema.partial().extend({
-  tags: z.array(z.string().trim().min(1).max(30)).max(12).optional()
+  tags: tagListSchema.optional()
 });
 
 export const aiActionSchema = z

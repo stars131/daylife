@@ -40,6 +40,15 @@ describe("event schema", () => {
     expect(() => eventMutationSchema.parse({ title: "全天测试", allDay: "yes" })).toThrow();
   });
 
+  it("normalizes tags before storage", () => {
+    const parsed = eventMutationSchema.parse({
+      title: "标签测试",
+      tags: [" 工作 ", "工作", "生活"]
+    });
+
+    expect(parsed.tags).toEqual(["工作", "生活"]);
+  });
+
   it("rejects an end time before start time", () => {
     expect(() =>
       eventMutationSchema.parse({
